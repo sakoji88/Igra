@@ -69,6 +69,13 @@ function getCellMeta(index: number) {
   return { gridColumn: 11, gridRow: index - 29, side: 'right' as CellSide, isCorner: false };
 }
 
+function getCornerClasses(index: number) {
+  if (index === 0) return 'rounded-br-[1.4rem] origin-bottom-right';
+  if (index === 10) return 'rounded-bl-[1.4rem] origin-bottom-left';
+  if (index === 20) return 'rounded-tl-[1.4rem] origin-top-left';
+  return 'rounded-tr-[1.4rem] origin-top-right';
+}
+
 function getInitials(name: string) {
   return name
     .split(' ')
@@ -155,21 +162,21 @@ function BoardCell({ cell, side, playersOnCell }: { cell: BoardCellData; side: C
   return (
     <div
       className={cn(
-        'relative flex aspect-square flex-col justify-between rounded-[1.55rem] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_14px_25px_rgba(0,0,0,0.24)]',
+        'relative flex h-full min-h-0 flex-col justify-between border border-black/30 p-2.5 sm:p-3',
         boardTypeStyles[cellType] ?? boardTypeStyles.REGULAR,
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="rounded-full bg-black/35 px-2 py-1 text-[10px] font-bold tracking-[0.25em] text-white/85">
+        <span className="bg-black/35 px-2 py-1 text-[9px] font-bold tracking-[0.25em] text-white/85">
           {cell.index}
         </span>
-        <span className="rounded-full border border-white/10 bg-black/25 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/80">
+        <span className="border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.18em] text-white/80">
           {cellType}
         </span>
       </div>
-      <div className="space-y-2">
-        <h4 className="text-sm font-black uppercase leading-tight tracking-[0.04em]">{cell.label}</h4>
-        <p className="text-[11px] text-white/70">
+      <div className="space-y-1.5">
+        <h4 className="text-[12px] font-black uppercase leading-tight tracking-[0.03em] sm:text-[13px]">{cell.label}</h4>
+        <p className="text-[10px] text-white/68">
           {points === 0 ? 'Спец-клетка' : `База: ${points} очк.`}
         </p>
       </div>
@@ -186,22 +193,23 @@ function CornerCell({ cell, side, playersOnCell }: { cell: BoardCellData; side: 
   return (
     <div
       className={cn(
-        'relative z-10 flex aspect-square flex-col justify-between rounded-[1.8rem] border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_24px_38px_rgba(0,0,0,0.32)] ring-1 ring-white/10',
-        'scale-[1.06]',
+        'relative z-10 flex h-full min-h-0 flex-col justify-between border border-black/35 p-3 sm:p-4 ring-1 ring-white/10',
+        'scale-[1.08]',
+        getCornerClasses(cell.index),
         boardTypeStyles[cellType] ?? boardTypeStyles.REGULAR,
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-black tracking-[0.28em] text-white/90">
+        <span className="bg-black/35 px-2.5 py-1 text-[10px] font-black tracking-[0.28em] text-white/90">
           {displayIndex}
         </span>
-        <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
+        <span className="border border-white/10 bg-black/25 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/80">
           {cellType}
         </span>
       </div>
-      <div className="space-y-2">
-        <h4 className="text-base font-black uppercase leading-tight">{cell.label}</h4>
-        <p className="text-xs text-white/72">
+      <div className="space-y-1.5">
+        <h4 className="text-sm font-black uppercase leading-tight sm:text-base">{cell.label}</h4>
+        <p className="text-[11px] text-white/72">
           {points === 0 ? 'Ключевая спец-клетка' : `База: ${points} очк.`}
         </p>
       </div>
@@ -213,28 +221,30 @@ function CornerCell({ cell, side, playersOnCell }: { cell: BoardCellData; side: 
 export function PerimeterBoard({ board, players, activePlayer, seasonName }: BoardProps) {
   return (
     <div className="relative mx-auto w-full max-w-[1120px]">
-      <div className="rounded-[2.25rem] border border-zinc-700/80 bg-[linear-gradient(135deg,rgba(24,24,27,0.98),rgba(9,9,11,0.99))] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-        <div className="grid aspect-square grid-cols-11 grid-rows-11 gap-3">
+      <div className="rounded-[2.35rem] border-[10px] border-zinc-800 bg-[linear-gradient(135deg,rgba(39,39,42,0.98),rgba(10,10,12,1))] p-3 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <div className="relative overflow-visible rounded-[1.7rem] border-2 border-zinc-600 bg-zinc-950 p-2">
+          <div className="pointer-events-none absolute inset-[17.5%] rounded-[1.2rem] border-2 border-zinc-700/90" />
+          <div className="grid aspect-square grid-cols-11 grid-rows-11 gap-px bg-zinc-800/90">
           {board.map((cell) => {
             const meta = getCellMeta(cell.index);
             const playersOnCell = players.filter((player) => player.boardPosition === cell.index);
             const CellComponent = meta.isCorner ? CornerCell : BoardCell;
 
             return (
-              <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }}>
+              <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }} className="bg-zinc-950">
                 <CellComponent cell={cell} side={meta.side} playersOnCell={playersOnCell} />
               </div>
             );
           })}
 
-          <div className="col-[4_/_9] row-[4_/_9] flex items-center justify-center">
-            <div className="w-full max-w-[320px] rounded-[1.8rem] border border-zinc-700/70 bg-black/55 p-5 text-center shadow-[0_18px_45px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+          <div className="col-[4_/_9] row-[4_/_9] flex items-center justify-center p-4">
+            <div className="w-full max-w-[280px] rounded-[1.3rem] border border-zinc-700/70 bg-black/60 p-4 text-center shadow-[0_18px_35px_rgba(0,0,0,0.18)] backdrop-blur-sm">
               <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Igra board</p>
-              <h3 className="mt-2 text-2xl font-black uppercase leading-tight text-white">{seasonName}</h3>
-              <p className="mt-3 text-sm text-zinc-300">
-                Настольное поле на 40 клеток. Главный акцент — движение по рамке, а центр держит только краткий статус сезона.
+              <h3 className="mt-2 text-xl font-black uppercase leading-tight text-white">{seasonName}</h3>
+              <p className="mt-2 text-xs text-zinc-300">
+                40 клеток по рамке. Центр — только краткий статус хода.
               </p>
-              <div className="mt-4 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-4 py-3 text-left">
+              <div className="mt-3 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-3 text-left">
                 <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-200">Сейчас ходит</p>
                 <div className="mt-2 flex items-center gap-3">
                   <PlayerToken player={activePlayer} />
@@ -246,6 +256,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName }: Boa
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
