@@ -3,6 +3,61 @@ import { boardCells, conditionTemplates, currentSeason, itemDefinitions, users, 
 export type Role = 'ADMIN' | 'JUDGE' | 'PLAYER';
 export type AssignmentStatus = 'PENDING' | 'ACTIVE' | 'WON' | 'DROPPED' | 'DISPUTED' | 'RESOLVED';
 export type ConditionType = 'BASE' | 'GENRE';
+export type BoardSlotSide = 'bottom' | 'left' | 'top' | 'right';
+
+function getBoardSide(index: number): BoardSlotSide {
+  if (index >= 0 && index <= 10) return 'bottom';
+  if (index >= 11 && index <= 20) return 'left';
+  if (index >= 21 && index <= 30) return 'top';
+  return 'right';
+}
+
+function getSideBasePoints(side: BoardSlotSide) {
+  if (side === 'bottom') return 1;
+  if (side === 'left') return 2;
+  if (side === 'top') return 3;
+  return 4;
+}
+
+function getSlotArt(type: string) {
+  if (type === 'START') return '🏁';
+  if (type === 'JAIL') return '🚓';
+  if (type === 'LOTTERY') return '🎰';
+  if (type === 'AUCTION') return '🔨';
+  if (type === 'WHEEL') return '🎡';
+  if (type === 'PODLYANKA') return '😈';
+  if (type === 'KAIFARIK') return '✨';
+  if (type === 'RANDOM') return '🎲';
+  return '🎮';
+}
+
+function getBaseConditions(label: string, side: BoardSlotSide, type: string) {
+  const sideLabel = side === 'bottom' ? 'нижней' : side === 'left' ? 'левой' : side === 'top' ? 'верхней' : 'правой';
+  const conditions = [
+    `Закрыть слот «${label}» по основным условиям ${sideLabel} стороны.`,
+    'Подтвердить результат стандартной кнопкой Win или Drop.',
+  ];
+
+  if (type === 'WHEEL') conditions.push('После приземления прокрутить wheel и принять результат.');
+  if (type === 'JAIL') conditions.push('Сначала разрулить тюремный эффект, затем вернуться в обычный цикл.');
+  if (type === 'LOTTERY' || type === 'AUCTION') conditions.push('Согласовать ручной спец-ивент с судьёй или админом.');
+  if (type === 'PODLYANKA' || type === 'KAIFARIK') conditions.push('Применить эффект клетки перед созданием нового рана.');
+
+  return conditions;
+}
+
+function getGenreConditions(label: string, type: string) {
+  const conditions = [
+    `Выбрать жанровое условие для слота «${label}».`,
+    'Закрыть слот в рамках выбранного жанрового ограничения.',
+  ];
+
+  if (type === 'REGULAR') conditions.push('Сделать жанровый проход без отката на базовые требования.');
+  if (type === 'RANDOM') conditions.push('Жанр определяется после разрешения случайного события клетки.');
+  if (type === 'WHEEL') conditions.push('Жанровый слот можно брать только после результата колеса.');
+
+  return conditions;
+}
 
 export const season = { ...currentSeason, id: 'season-1' };
 
@@ -29,7 +84,26 @@ export const players = users.filter((user) => user.role === 'PLAYER').map((user,
   } : null,
 }));
 
-export const board = boardCells.map(([label, type, points], index) => ({ id: `cell-${index}`, index, label, type, points }));
+export const board = boardCells.map(([label, type], index) => {
+  const side = getBoardSide(index);
+  const basePoints = getSideBasePoints(side);
+
+  return {
+    id: `cell-${index}`,
+    index,
+    slotNumber: index,
+    name: String(label),
+    label: String(label),
+    type: String(type),
+    side,
+    points: basePoints,
+    imageUrl: null,
+    imageFallback: getSlotArt(String(type)),
+    description: `Слот ${index} на ${side} стороне поля.`,
+    baseConditions: getBaseConditions(String(label), side, String(type)),
+    genreConditions: getGenreConditions(String(label), String(type)),
+  };
+});
 export const conditions = conditionTemplates;
 export const items = itemDefinitions;
 export const wheelDefinitions = wheels;

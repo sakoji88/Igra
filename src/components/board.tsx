@@ -1,11 +1,23 @@
+'use client';
+
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
+
+type BoardSlotSide = 'bottom' | 'left' | 'top' | 'right';
 
 type BoardCellData = {
   id: string;
   index: number;
-  label: string | number;
-  type: string | number;
-  points: string | number;
+  slotNumber: number;
+  name: string;
+  type: string;
+  side: BoardSlotSide;
+  points: number;
+  imageUrl: string | null;
+  imageFallback: string;
+  baseConditions: string[];
+  genreConditions: string[];
+  description?: string;
 };
 
 type BoardPlayerData = {
@@ -23,57 +35,76 @@ type BoardProps = {
   seasonName: string;
 };
 
-type CellSide = 'bottom' | 'left' | 'top' | 'right';
-
-const boardTypeStyles: Record<string, string> = {
-  START: 'border-cyan-300/80 bg-cyan-500/18 text-cyan-50',
-  REGULAR: 'border-zinc-700 bg-zinc-950 text-white',
-  PODLYANKA: 'border-red-400/80 bg-red-500/18 text-red-50',
-  WHEEL: 'border-fuchsia-400/80 bg-fuchsia-500/18 text-fuchsia-50',
-  JAIL: 'border-orange-300/80 bg-orange-500/18 text-orange-50',
-  LOTTERY: 'border-emerald-300/80 bg-emerald-500/18 text-emerald-50',
-  AUCTION: 'border-yellow-200/80 bg-yellow-400/18 text-yellow-50',
-  RANDOM: 'border-violet-300/80 bg-violet-500/18 text-violet-50',
-  KAIFARIK: 'border-lime-300/80 bg-lime-500/18 text-lime-50',
+type CellMeta = {
+  gridColumn: number;
+  gridRow: number;
+  side: BoardSlotSide;
+  isCorner: boolean;
 };
 
-function getCellMeta(index: number) {
+const boardTypeStyles: Record<string, string> = {
+  START: 'from-cyan-500/28 to-cyan-950 text-cyan-50',
+  REGULAR: 'from-zinc-900 to-zinc-950 text-white',
+  PODLYANKA: 'from-red-500/26 to-zinc-950 text-red-50',
+  WHEEL: 'from-fuchsia-500/26 to-zinc-950 text-fuchsia-50',
+  JAIL: 'from-orange-500/26 to-zinc-950 text-orange-50',
+  LOTTERY: 'from-emerald-500/26 to-zinc-950 text-emerald-50',
+  AUCTION: 'from-yellow-400/26 to-zinc-950 text-yellow-50',
+  RANDOM: 'from-violet-500/26 to-zinc-950 text-violet-50',
+  KAIFARIK: 'from-lime-500/26 to-zinc-950 text-lime-50',
+};
+
+function getCellMeta(index: number): CellMeta {
   if (index === 0) {
-    return { gridColumn: 11, gridRow: 11, side: 'bottom' as CellSide, isCorner: true };
+    return { gridColumn: 11, gridRow: 11, side: 'bottom', isCorner: true };
   }
 
   if (index > 0 && index < 10) {
-    return { gridColumn: 11 - index, gridRow: 11, side: 'bottom' as CellSide, isCorner: false };
+    return { gridColumn: 11 - index, gridRow: 11, side: 'bottom', isCorner: false };
   }
 
   if (index === 10) {
-    return { gridColumn: 1, gridRow: 11, side: 'left' as CellSide, isCorner: true };
+    return { gridColumn: 1, gridRow: 11, side: 'left', isCorner: true };
   }
 
   if (index > 10 && index < 20) {
-    return { gridColumn: 1, gridRow: 21 - index, side: 'left' as CellSide, isCorner: false };
+    return { gridColumn: 1, gridRow: 21 - index, side: 'left', isCorner: false };
   }
 
   if (index === 20) {
-    return { gridColumn: 1, gridRow: 1, side: 'top' as CellSide, isCorner: true };
+    return { gridColumn: 1, gridRow: 1, side: 'top', isCorner: true };
   }
 
   if (index > 20 && index < 30) {
-    return { gridColumn: index - 19, gridRow: 1, side: 'top' as CellSide, isCorner: false };
+    return { gridColumn: index - 19, gridRow: 1, side: 'top', isCorner: false };
   }
 
   if (index === 30) {
-    return { gridColumn: 11, gridRow: 1, side: 'right' as CellSide, isCorner: true };
+    return { gridColumn: 11, gridRow: 1, side: 'right', isCorner: true };
   }
 
-  return { gridColumn: 11, gridRow: index - 29, side: 'right' as CellSide, isCorner: false };
+  return { gridColumn: 11, gridRow: index - 29, side: 'right', isCorner: false };
 }
 
 function getCornerClasses(index: number) {
-  if (index === 0) return 'rounded-br-[1.4rem] origin-bottom-right';
-  if (index === 10) return 'rounded-bl-[1.4rem] origin-bottom-left';
-  if (index === 20) return 'rounded-tl-[1.4rem] origin-top-left';
-  return 'rounded-tr-[1.4rem] origin-top-right';
+  if (index === 0) return 'rounded-br-[1.35rem] origin-bottom-right';
+  if (index === 10) return 'rounded-bl-[1.35rem] origin-bottom-left';
+  if (index === 20) return 'rounded-tl-[1.35rem] origin-top-left';
+  return 'rounded-tr-[1.35rem] origin-top-right';
+}
+
+function getSideLabel(side: BoardSlotSide) {
+  if (side === 'bottom') return 'нижняя';
+  if (side === 'left') return 'левая';
+  if (side === 'top') return 'верхняя';
+  return 'правая';
+}
+
+function getSideBasePoints(side: BoardSlotSide) {
+  if (side === 'bottom') return 1;
+  if (side === 'left') return 2;
+  if (side === 'top') return 3;
+  return 4;
 }
 
 function getInitials(name: string) {
@@ -85,7 +116,7 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-function getMarkerPlacementClasses(side: CellSide, isCorner: boolean) {
+function getMarkerPlacementClasses(side: BoardSlotSide, isCorner: boolean) {
   if (side === 'bottom') {
     return cn('left-1/2 top-full -translate-x-1/2 flex-col pt-2', isCorner && 'items-end pr-1');
   }
@@ -101,7 +132,7 @@ function getMarkerPlacementClasses(side: CellSide, isCorner: boolean) {
   return cn('left-full top-1/2 -translate-y-1/2 flex-row pl-2', isCorner && 'items-start');
 }
 
-function getMarkerTailClasses(side: CellSide) {
+function getMarkerTailClasses(side: BoardSlotSide) {
   if (side === 'bottom' || side === 'top') {
     return 'h-4 w-px';
   }
@@ -135,7 +166,7 @@ function PlayerToken({ player }: { player: BoardPlayerData }) {
   );
 }
 
-function CellPlayerMarkers({ players, side, isCorner }: { players: BoardPlayerData[]; side: CellSide; isCorner: boolean }) {
+function CellPlayerMarkers({ players, side, isCorner }: { players: BoardPlayerData[]; side: BoardSlotSide; isCorner: boolean }) {
   if (players.length === 0) return null;
 
   return (
@@ -155,108 +186,157 @@ function CellPlayerMarkers({ players, side, isCorner }: { players: BoardPlayerDa
   );
 }
 
-function BoardCell({ cell, side, playersOnCell }: { cell: BoardCellData; side: CellSide; playersOnCell: BoardPlayerData[] }) {
-  const cellType = String(cell.type);
-  const points = Number(cell.points);
+function SlotArtwork({ cell, isCorner }: { cell: BoardCellData; isCorner: boolean }) {
+  if (cell.imageUrl) {
+    return (
+      <div
+        className="h-full w-full rounded-[1rem] bg-cover bg-center"
+        style={{ backgroundImage: `url(${cell.imageUrl})` }}
+      />
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        'relative flex h-full min-h-0 flex-col justify-between border border-black/30 p-2.5 sm:p-3',
-        boardTypeStyles[cellType] ?? boardTypeStyles.REGULAR,
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="bg-black/35 px-2 py-1 text-[9px] font-bold tracking-[0.25em] text-white/85">
-          {cell.index}
-        </span>
-        <span className="border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.18em] text-white/80">
-          {cellType}
-        </span>
-      </div>
-      <div className="space-y-1.5">
-        <h4 className="text-[12px] font-black uppercase leading-tight tracking-[0.03em] sm:text-[13px]">{cell.label}</h4>
-        <p className="text-[10px] text-white/68">
-          {points === 0 ? 'Спец-клетка' : `База: ${points} очк.`}
-        </p>
-      </div>
-      <CellPlayerMarkers players={playersOnCell} side={side} isCorner={false} />
+    <div className="flex h-full w-full items-center justify-center rounded-[1rem] border border-white/10 bg-black/20">
+      <span className={cn('drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]', isCorner ? 'text-5xl' : 'text-4xl')}>
+        {cell.imageFallback}
+      </span>
     </div>
   );
 }
 
-function CornerCell({ cell, side, playersOnCell }: { cell: BoardCellData; side: CellSide; playersOnCell: BoardPlayerData[] }) {
-  const cellType = String(cell.type);
-  const points = Number(cell.points);
-  const displayIndex = cell.index === 0 ? '0 / 40' : String(cell.index);
+function BoardTile({
+  cell,
+  meta,
+  playersOnCell,
+  onSelect,
+}: {
+  cell: BoardCellData;
+  meta: CellMeta;
+  playersOnCell: BoardPlayerData[];
+  onSelect: (cell: BoardCellData) => void;
+}) {
+  const isCorner = meta.isCorner;
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onSelect(cell)}
       className={cn(
-        'relative z-10 flex h-full min-h-0 flex-col justify-between border border-black/35 p-3 sm:p-4 ring-1 ring-white/10',
-        'scale-[1.08]',
-        getCornerClasses(cell.index),
-        boardTypeStyles[cellType] ?? boardTypeStyles.REGULAR,
+        'relative flex h-full w-full flex-col border border-black/35 bg-gradient-to-br p-2 text-left transition-transform hover:z-20 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-cyan-300/70',
+        isCorner ? cn('p-3 sm:p-4', getCornerClasses(cell.index), 'scale-[1.06]') : 'p-2.5 sm:p-3',
+        boardTypeStyles[cell.type] ?? boardTypeStyles.REGULAR,
       )}
+      aria-label={`Открыть слот ${cell.slotNumber}: ${cell.name}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <span className="bg-black/35 px-2.5 py-1 text-[10px] font-black tracking-[0.28em] text-white/90">
-          {displayIndex}
-        </span>
-        <span className="border border-white/10 bg-black/25 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/80">
-          {cellType}
+      <div className="flex items-start justify-between">
+        <span className={cn('bg-black/45 px-2 py-1 font-black tracking-[0.28em] text-white/90', isCorner ? 'text-[10px]' : 'text-[9px]')}>
+          {cell.slotNumber === 0 ? '0 / 40' : cell.slotNumber}
         </span>
       </div>
-      <div className="space-y-1.5">
-        <h4 className="text-sm font-black uppercase leading-tight sm:text-base">{cell.label}</h4>
-        <p className="text-[11px] text-white/72">
-          {points === 0 ? 'Ключевая спец-клетка' : `База: ${points} очк.`}
-        </p>
+      <div className="mt-2 flex-1">
+        <SlotArtwork cell={cell} isCorner={isCorner} />
       </div>
-      <CellPlayerMarkers players={playersOnCell} side={side} isCorner />
+      <CellPlayerMarkers players={playersOnCell} side={meta.side} isCorner={isCorner} />
+    </button>
+  );
+}
+
+function SlotDetailWindow({
+  cell,
+  onClose,
+}: {
+  cell: BoardCellData;
+  onClose: () => void;
+}) {
+  const basePoints = getSideBasePoints(cell.side);
+  const genrePoints = basePoints * 2;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center p-6">
+      <div className="pointer-events-auto w-full max-w-[720px] rounded-[1.6rem] border border-zinc-700 bg-zinc-950/96 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] backdrop-blur">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-300">Слот {cell.slotNumber === 0 ? '0 / 40' : cell.slotNumber}</p>
+            <h4 className="mt-2 text-2xl font-black text-white">{cell.name}</h4>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-200">
+              <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1">Сторона: {getSideLabel(cell.side)}</span>
+              <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1">Основные: {basePoints}</span>
+              <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1">Жанровые: {genrePoints}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:border-cyan-300 hover:text-white"
+          >
+            Закрыть
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+            <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">Основные условия</p>
+            <ul className="mt-3 space-y-2 text-sm text-zinc-200">
+              {cell.baseConditions.map((condition) => <li key={condition}>• {condition}</li>)}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+            <p className="text-xs uppercase tracking-[0.25em] text-pink-300">Жанровые условия</p>
+            <ul className="mt-3 space-y-2 text-sm text-zinc-200">
+              {cell.genreConditions.map((condition) => <li key={condition}>• {condition}</li>)}
+            </ul>
+          </div>
+        </div>
+
+        {cell.description && (
+          <p className="mt-4 text-xs text-zinc-400">{cell.description}</p>
+        )}
+      </div>
     </div>
   );
 }
 
 export function PerimeterBoard({ board, players, activePlayer, seasonName }: BoardProps) {
+  const [selectedCell, setSelectedCell] = useState<BoardCellData | null>(null);
+
   return (
     <div className="relative mx-auto w-full max-w-[1120px]">
       <div className="rounded-[2.35rem] border-[10px] border-zinc-800 bg-[linear-gradient(135deg,rgba(39,39,42,0.98),rgba(10,10,12,1))] p-3 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
         <div className="relative overflow-visible rounded-[1.7rem] border-2 border-zinc-600 bg-zinc-950 p-2">
           <div className="pointer-events-none absolute inset-[17.5%] rounded-[1.2rem] border-2 border-zinc-700/90" />
           <div className="grid aspect-square grid-cols-11 grid-rows-11 gap-px bg-zinc-800/90">
-          {board.map((cell) => {
-            const meta = getCellMeta(cell.index);
-            const playersOnCell = players.filter((player) => player.boardPosition === cell.index);
-            const CellComponent = meta.isCorner ? CornerCell : BoardCell;
+            {board.map((cell) => {
+              const meta = getCellMeta(cell.slotNumber);
+              const playersOnCell = players.filter((player) => player.boardPosition === cell.slotNumber);
 
-            return (
-              <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }} className="bg-zinc-950">
-                <CellComponent cell={cell} side={meta.side} playersOnCell={playersOnCell} />
-              </div>
-            );
-          })}
+              return (
+                <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }} className="bg-zinc-950">
+                  <BoardTile cell={cell} meta={meta} playersOnCell={playersOnCell} onSelect={setSelectedCell} />
+                </div>
+              );
+            })}
 
-          <div className="col-[4_/_9] row-[4_/_9] flex items-center justify-center p-4">
-            <div className="w-full max-w-[280px] rounded-[1.3rem] border border-zinc-700/70 bg-black/60 p-4 text-center shadow-[0_18px_35px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-              <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Igra board</p>
-              <h3 className="mt-2 text-xl font-black uppercase leading-tight text-white">{seasonName}</h3>
-              <p className="mt-2 text-xs text-zinc-300">
-                40 клеток по рамке. Центр — только краткий статус хода.
-              </p>
-              <div className="mt-3 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-3 text-left">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-200">Сейчас ходит</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <PlayerToken player={activePlayer} />
-                  <div>
-                    <p className="font-black text-white">{activePlayer.displayName}</p>
-                    <p className="text-xs text-zinc-300">Клетка {activePlayer.boardPosition}</p>
+            <div className="col-[4_/_9] row-[4_/_9] flex items-center justify-center p-4">
+              <div className="w-full max-w-[280px] rounded-[1.3rem] border border-zinc-700/70 bg-black/60 p-4 text-center shadow-[0_18px_35px_rgba(0,0,0,0.18)] backdrop-blur-sm">
+                <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Igra board</p>
+                <h3 className="mt-2 text-xl font-black uppercase leading-tight text-white">{seasonName}</h3>
+                <p className="mt-2 text-xs text-zinc-300">Центр хранит только краткий статус. Вся детализация слота открывается по клику.</p>
+                <div className="mt-3 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-3 text-left">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-200">Сейчас ходит</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <PlayerToken player={activePlayer} />
+                    <div>
+                      <p className="font-black text-white">{activePlayer.displayName}</p>
+                      <p className="text-xs text-zinc-300">Клетка {activePlayer.boardPosition}</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+
+          {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} /> : null}
         </div>
       </div>
     </div>
