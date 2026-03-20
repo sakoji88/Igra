@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth/config';
 
-const links = [
+const links: Array<[string, '/' | '/board' | '/players' | '/rules' | '/admin']> = [
   ['Дашборд', '/'],
   ['Поле', '/board'],
   ['Игроки', '/players'],
