@@ -1,0 +1,103 @@
+export const currentSeason = { slug: 'spring-2026', name: 'Весенний мемомес 2026' };
+
+export const seedAdmin = {
+  nickname: 'admin',
+  password: 'admin123',
+  role: 'ADMIN' as const,
+  avatarUrl: 'https://i.pravatar.cc/150?img=12',
+  displayName: 'Главмем',
+};
+
+export const defaultRules = [
+  {
+    title: 'Базовые правила',
+    slug: 'core-rules',
+    order: 1,
+    content: 'Все игроки стартуют на клетке Старт. Ход определяется суммой двух d6. После движения игрок сначала разрешает клетку, а затем выбирает base или genre условия.',
+  },
+  {
+    title: 'Раны и подтверждение',
+    slug: 'runs-and-results',
+    order: 2,
+    content: 'Жанровые условия всегда дают x2 от базовых очков стороны. Игрок подтверждает результат вручную: completed или dropped. Спорные кейсы решает judge/admin.',
+  },
+  {
+    title: 'Предметы и лог',
+    slug: 'items-and-log',
+    order: 3,
+    content: 'Инвентарь и правила редактируются через админку. Все важные действия пишутся в event log: регистрация, броски кубов, создание рана, завершение, выдача предметов и правки правил.',
+  },
+];
+
+export const defaultItemDefinitions = [
+  {
+    number: 1,
+    name: 'Энергос',
+    type: 'BUFF' as const,
+    description: 'Даёт мемную уверенность перед следующим раном.',
+    imageUrl: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=300&q=80',
+    chargesDefault: 1,
+    allowedTargets: 'self',
+  },
+  {
+    number: 2,
+    name: 'Думскролл',
+    type: 'DEBUFF' as const,
+    description: 'Мешает сосредоточиться и портит вайб.',
+    imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=300&q=80',
+    chargesDefault: 1,
+    allowedTargets: 'self,other',
+  },
+  {
+    number: 3,
+    name: 'Банановая мина',
+    type: 'TRAP' as const,
+    description: 'Подложить другому игроку под следующий ход.',
+    imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=300&q=80',
+    chargesDefault: 1,
+    allowedTargets: 'other',
+  },
+];
+
+export const boardCells = [
+  ['Старт x Финиш', 'START'],
+  ['Инди-разогрев', 'REGULAR'],
+  ['Подлянка', 'PODLYANKA'],
+  ['Рогалик-квартал', 'REGULAR'],
+  ['Колесо мемов', 'WHEEL'],
+  ['Кооп-угол', 'REGULAR'],
+  ['Случайный ран', 'RANDOM'],
+  ['Хоррор-сектор', 'REGULAR'],
+  ['Кайфарик', 'KAIFARIK'],
+  ['JRPG-линия', 'REGULAR'],
+  ['Тюрьма', 'JAIL'],
+  ['Инди-подвал', 'REGULAR'],
+  ['Колесо бустов', 'WHEEL'],
+  ['Аркадный зал', 'REGULAR'],
+  ['Подлянка+', 'PODLYANKA'],
+  ['Метроидвания', 'REGULAR'],
+  ['Случайный жанр', 'RANDOM'],
+  ['Кооп-рейд', 'REGULAR'],
+  ['Кайфарик+', 'KAIFARIK'],
+  ['Шутерная улица', 'REGULAR'],
+  ['Аукционная', 'AUCTION'],
+  ['Инди-переулок', 'REGULAR'],
+  ['Колесо боли', 'WHEEL'],
+  ['Выживач-клетка', 'REGULAR'],
+  ['Подлянка XXL', 'PODLYANKA'],
+  ['Стратегический блок', 'REGULAR'],
+  ['Случайный челлендж', 'RANDOM'],
+  ['Пиксель-нора', 'REGULAR'],
+  ['Кайфарик deluxe', 'KAIFARIK'],
+  ['Соулс-авеню', 'REGULAR'],
+  ['Лотерея', 'LOTTERY'],
+  ['Инди-ярмарка', 'REGULAR'],
+  ['Колесо угара', 'WHEEL'],
+  ['Файтинг-угол', 'REGULAR'],
+  ['Подлянка turbo', 'PODLYANKA'],
+  ['Платформерная', 'REGULAR'],
+  ['Случайный боссфайт', 'RANDOM'],
+  ['Хаос-клетка', 'REGULAR'],
+  ['Кайфарик finale', 'KAIFARIK'],
+  ['Финишная прямая', 'REGULAR'],
+] as const;
