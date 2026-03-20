@@ -1,27 +1,22 @@
+export const dynamic = 'force-dynamic';
 import { AppLayout } from '@/components/layout';
 import { Card } from '@/components/ui/card';
-
-const sections: Array<[string, string[]]> = [
-  ['Базовые правила', ['Все стартуют на клетке «Старт».', 'Ход определяется суммой двух d6.', 'Счёт считается только на сервере.']],
-  ['Поток хода', ['Активный игрок бросает 2d6.', 'После перемещения система сначала разрешает клетку.', 'Только затем игрок выбирает base или genre условия.']],
-  ['Клетки', ['Обычные клетки выдают ран.', 'Special-клетки: тюрьма, лотерея, аукцион, подлянка, кайфарик, колесо.', 'Прохождение круга даёт бонус за полный оборот.']],
-  ['Предметы и эффекты', ['Дебаффы приоритетнее баффов.', 'Конфликтующие эффекты аннигилируют друг друга.', 'Стакать одинаковые эффекты нельзя.']],
-  ['Подтверждение результата', ['Игроку доступны только две кнопки: Win и Drop.', 'Спорные кейсы переводятся в disputed и решаются судьёй/админом.']],
-  ['Глоссарий', ['Подлянка — негативная случайная таблица.', 'Кайфарик — позитивная случайная таблица.', 'Аукцион — ручной специвент от судьи или админа.']],
-];
+import { prisma } from '@/lib/prisma';
 
 export default async function RulesPage() {
+  const sections = await prisma.ruleSection.findMany({ where: { published: true }, orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }] });
+
   return (
     <AppLayout>
       <div className="grid gap-6">
         <Card>
           <h2 className="text-3xl font-black">Энциклопедия правил MVP</h2>
-          <p className="mt-3 max-w-3xl text-zinc-400">Текст держит дух исходного Excel-ивента, но в MVP кодирует только устойчивые правила: движение, типы условий, Win/Drop, спорные кейсы, инвентарь, случайные колёса и ручные вмешательства роли judge/admin.</p>
+          <p className="mt-3 max-w-3xl text-zinc-400">Правила теперь читаются из базы и правятся через админку, а не хардкодятся прямо в page component.</p>
         </Card>
-        {sections.map(([title, items]) => (
-          <Card key={title}>
-            <h3 className="text-xl font-bold">{title}</h3>
-            <ul className="mt-4 list-disc space-y-2 pl-5 text-zinc-300">{items.map((item) => <li key={item}>{item}</li>)}</ul>
+        {sections.map((section) => (
+          <Card key={section.id}>
+            <h3 className="text-xl font-bold">{section.title}</h3>
+            <p className="mt-4 whitespace-pre-wrap text-zinc-300">{section.content}</p>
           </Card>
         ))}
       </div>

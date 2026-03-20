@@ -33,7 +33,7 @@ export function applyEffects(existing: Effect[], incoming: Effect) {
 }
 
 export function calculateScore(basePoints: number, conditionType: 'BASE' | 'GENRE', didPassStart = false) {
-  const multiplier = conditionType === 'GENRE' ? 1.5 : 1;
+  const multiplier = conditionType === 'GENRE' ? 2 : 1;
   return Math.round(basePoints * multiplier + (didPassStart ? 3 : 0));
 }
 

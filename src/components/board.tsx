@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 type BoardSlotSide = 'bottom' | 'left' | 'top' | 'right';
@@ -18,6 +19,7 @@ type BoardCellData = {
   baseConditions: string[];
   genreConditions: string[];
   description?: string;
+  playable?: boolean;
 };
 
 type BoardPlayerData = {
@@ -33,6 +35,9 @@ type BoardProps = {
   players: BoardPlayerData[];
   activePlayer: BoardPlayerData;
   seasonName: string;
+  currentPosition: number;
+  hasActiveRun: boolean;
+  initialRoll?: { die1: number | null; die2: number | null; total: number | null };
 };
 
 type CellMeta = {
@@ -245,9 +250,15 @@ function BoardTile({
 function SlotDetailWindow({
   cell,
   onClose,
+  canAssign,
+  onAssign,
+  isPending,
 }: {
   cell: BoardCellData;
   onClose: () => void;
+  canAssign: boolean;
+  onAssign: (conditionType: 'BASE' | 'GENRE') => void;
+  isPending: boolean;
 }) {
   const basePoints = getSideBasePoints(cell.side);
   const genrePoints = basePoints * 2;
@@ -292,13 +303,60 @@ function SlotDetailWindow({
         {cell.description && (
           <p className="mt-4 text-xs text-zinc-400">{cell.description}</p>
         )}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={!canAssign || isPending}
+            onClick={() => onAssign('BASE')}
+            className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Выбрать Base
+          </button>
+          <button
+            type="button"
+            disabled={!canAssign || isPending}
+            onClick={() => onAssign('GENRE')}
+            className="rounded-full border border-pink-400/40 bg-pink-500/10 px-4 py-2 text-sm text-pink-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Выбрать Genre
+          </button>
+          {!canAssign ? <p className="text-xs text-zinc-500">Ран можно создать только на текущей игровой клетке и только если у игрока нет активного рана.</p> : null}
+        </div>
       </div>
     </div>
   );
 }
 
-export function PerimeterBoard({ board, players, activePlayer, seasonName }: BoardProps) {
+export function PerimeterBoard({ board, players, activePlayer, seasonName, currentPosition, hasActiveRun, initialRoll }: BoardProps) {
   const [selectedCell, setSelectedCell] = useState<BoardCellData | null>(null);
+  const [rollState, setRollState] = useState(initialRoll);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const handleRoll = () => startTransition(async () => {
+    const response = await fetch('/api/board/roll', { method: 'POST' });
+    if (!response.ok) return;
+    const payload = await response.json();
+    setRollState({ die1: payload.die1, die2: payload.die2, total: payload.total });
+    if (payload.landedSlot?.playable) {
+      const nextCell = board.find((cell) => cell.id === payload.landedSlot.id);
+      if (nextCell) setSelectedCell(nextCell);
+    }
+    router.refresh();
+  });
+
+  const handleAssign = (conditionType: 'BASE' | 'GENRE') => startTransition(async () => {
+    if (!selectedCell) return;
+    const response = await fetch('/api/board/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slotId: selectedCell.id, conditionType }),
+    });
+    if (response.ok) {
+      setSelectedCell(null);
+      router.refresh();
+    }
+  });
 
   return (
     <div className="relative mx-auto w-full max-w-[1120px]">
@@ -332,11 +390,33 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName }: Boa
                     </div>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleRoll}
+                  disabled={isPending}
+                  className="mt-3 w-full rounded-2xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPending ? 'Бросаем...' : 'Roll Dice'}
+                </button>
+                {rollState?.total ? (
+                  <div className="mt-3 rounded-2xl border border-zinc-700 bg-zinc-900/70 px-3 py-3 text-left text-xs text-zinc-200">
+                    <p>Кости: {rollState.die1} + {rollState.die2}</p>
+                    <p className="mt-1 font-bold text-white">Сумма: {rollState.total}</p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
 
-          {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} /> : null}
+          {selectedCell ? (
+            <SlotDetailWindow
+              cell={selectedCell}
+              onClose={() => setSelectedCell(null)}
+              canAssign={Boolean(selectedCell.playable && selectedCell.slotNumber === currentPosition && !hasActiveRun)}
+              onAssign={handleAssign}
+              isPending={isPending}
+            />
+          ) : null}
         </div>
       </div>
     </div>

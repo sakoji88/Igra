@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { auth } from '@/lib/auth/config';
+import { redirect } from 'next/navigation';
+import { auth, signOut } from '@/lib/auth/config';
 
 const links: Array<[string, '/' | '/board' | '/players' | '/rules' | '/admin']> = [
   ['Дашборд', '/'],
@@ -11,6 +12,7 @@ const links: Array<[string, '/' | '/board' | '/players' | '/rules' | '/admin']> 
 
 export async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  if (!session?.user?.id) redirect('/login');
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
@@ -20,15 +22,28 @@ export async function AppLayout({ children }: { children: React.ReactNode }) {
           <h1 className="text-2xl font-black">Сезонный хаос для своих</h1>
         </div>
         <nav className="flex flex-wrap gap-2 text-sm text-zinc-200">
-          {links.map(([label, href]) => (
-            <Link key={href} href={href} className="rounded-full border border-zinc-700 px-3 py-1 hover:border-pink-400">
-              {label}
-            </Link>
-          ))}
+          {links
+            .filter(([, href]) => href !== '/admin' || session.user.role === 'ADMIN' || session.user.role === 'JUDGE')
+            .map(([label, href]) => (
+              <Link key={href} href={href} className="rounded-full border border-zinc-700 px-3 py-1 hover:border-pink-400">
+                {label}
+              </Link>
+            ))}
         </nav>
         <div className="text-right text-sm text-zinc-400">
-          <p>{session?.user?.name ?? 'Гость'}</p>
-          <p>{session?.user?.role ?? 'anon'}</p>
+          <p>{session.user.name ?? 'Игрок'}</p>
+          <p>{session.user.role ?? 'PLAYER'}</p>
+          <form
+            action={async () => {
+              'use server';
+              await signOut({ redirectTo: '/login' });
+            }}
+            className="mt-2"
+          >
+            <button type="submit" className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:border-cyan-300">
+              Выйти
+            </button>
+          </form>
         </div>
       </header>
       {children}

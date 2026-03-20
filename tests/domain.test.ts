@@ -34,6 +34,6 @@ test('assignment transitions follow judge/admin restrictions', () => {
 
 test('score update logic supports genre and lap bonus', () => {
   assert.equal(calculateScore(4, 'BASE', false), 4);
-  assert.equal(calculateScore(4, 'GENRE', false), 6);
-  assert.equal(calculateScore(4, 'GENRE', true), 9);
+  assert.equal(calculateScore(4, 'GENRE', false), 8);
+  assert.equal(calculateScore(4, 'GENRE', true), 11);
 });
