@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role { ADMIN JUDGE PLAYER }
+enum CellType { START REGULAR RANDOM JAIL LOTTERY AUCTION PODLYANKA KAIFARIK WHEEL }
+enum ConditionType { BASE GENRE }
+enum AssignmentStatus { PENDING ACTIVE WON DROPPED DISPUTED RESOLVED }
+enum ItemCategory { BUFF DEBUFF TRAP NEUTRAL }
+enum EventType { TURN ASSIGNMENT ITEM ADMIN IMPORT SYSTEM }
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  passwordHash  String
+  role          Role
+  profile       PlayerProfile?
+  createdAt     DateTime @default(now())
+}
+
+model PlayerProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  displayName    String
+  avatarUrl      String?
+  bio            String?
+  legacyStats    Json?
+  lifetimeStats  Json?
+}
+
+model Season {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model PlayerSeasonState {
+  id               String   @id @default(cuid())
+  seasonId         String
+  userId           String
+  score            Int      @default(0)
+  boardPosition    Int      @default(0)
+  turnOrder        Int      @default(0)
+  isActivePlayer   Boolean  @default(false)
+  drops            Int      @default(0)
+  completedRuns    Int      @default(0)
+  activeAssignmentId String?
+}
+
+model BoardCell {
+  id          String   @id @default(cuid())
+  seasonId     String
+  index        Int
+  label        String
+  type         CellType
+  points       Int      @default(0)
+  payload      Json?
+}
+
+model Assignment {
+  id            String   @id @default(cuid())
+  seasonId      String
+  userId        String
+  title         String
+  conditionType ConditionType
+  status        AssignmentStatus
+  pointsAwarded Int      @default(0)
+  metadata      Json?
+}
+
+model ItemDefinition {
+  id          String @id @default(cuid())
+  code        String @unique
+  name        String
+  category    ItemCategory
+  conflictKey String?
+  charges     Int    @default(1)
+  payload     Json?
+}
+
+model EventLog {
+  id          String    @id @default(cuid())
+  seasonId     String
+  actorId      String?
+  targetId     String?
+  type         EventType
+  summary      String
+  payload      Json?
+  createdAt    DateTime  @default(now())
+}
