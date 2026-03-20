@@ -1,38 +1,9 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PerimeterBoard } from '@/components/board';
 import { assignments, board, eventLog, players, season, wheelDefinitions } from '@/lib/data/mock';
 import { calculateScore } from '@/lib/domain/game';
 import Link from 'next/link';
-
-const boardTypeStyles: Record<string, string> = {
-  START: 'border-cyan-400/70 bg-cyan-500/15 text-cyan-100',
-  REGULAR: 'border-zinc-700 bg-zinc-900/95 text-white',
-  PODLYANKA: 'border-red-500/70 bg-red-500/15 text-red-100',
-  WHEEL: 'border-fuchsia-500/70 bg-fuchsia-500/15 text-fuchsia-100',
-  JAIL: 'border-orange-400/70 bg-orange-500/15 text-orange-100',
-  LOTTERY: 'border-emerald-400/70 bg-emerald-500/15 text-emerald-100',
-  AUCTION: 'border-yellow-300/70 bg-yellow-400/15 text-yellow-100',
-  RANDOM: 'border-violet-400/70 bg-violet-500/15 text-violet-100',
-  KAIFARIK: 'border-lime-400/70 bg-lime-500/15 text-lime-100',
-};
-
-const cornerIndexes = new Set([0, 10, 20, 30]);
-
-function getBoardCellPlacement(index: number) {
-  if (index >= 20 && index <= 30) {
-    return { gridColumn: index - 19, gridRow: 1 };
-  }
-
-  if (index >= 31 && index <= 39) {
-    return { gridColumn: 11, gridRow: index - 29 };
-  }
-
-  if (index >= 10 && index <= 19) {
-    return { gridColumn: 21 - index, gridRow: 11 };
-  }
-
-  return { gridColumn: 1, gridRow: 11 - index };
-}
 
 export function DashboardView() {
   const activePlayer = players.find((player) => player.isActivePlayer);
@@ -107,94 +78,20 @@ export function BoardView() {
   const activePlayer = players.find((player) => player.isActivePlayer)!;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+    <div className="grid gap-6 xl:grid-cols-[2.2fr_0.8fr]">
       <Card>
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">Поле сезона</p>
-            <h2 className="text-2xl font-black">Монопольное поле на 40 клеток</h2>
+            <h2 className="text-2xl font-black">Поле как настоящая настолка, а не widget</h2>
           </div>
           <div className="text-right text-sm text-zinc-400">
             <p>Активный ход</p>
             <p className="font-bold text-white">{activePlayer.displayName}</p>
           </div>
         </div>
-        <div className="mt-6 overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 p-3 shadow-[0_0_60px_rgba(244,114,182,0.12)]">
-          <div className="grid aspect-square grid-cols-11 grid-rows-11 gap-2">
-            {board.map((cell) => {
-              const placement = getBoardCellPlacement(cell.index);
-              const here = players.filter((player) => player.boardPosition === cell.index);
-              const isCorner = cornerIndexes.has(cell.index);
-              const cellStyle = boardTypeStyles[cell.type] ?? boardTypeStyles.REGULAR;
-              const displayIndex = cell.index === 0 ? '0 / 40' : String(cell.index);
-
-              return (
-                <div
-                  key={cell.id}
-                  style={placement}
-                  className={[
-                    'flex min-h-0 flex-col justify-between overflow-hidden rounded-[1.35rem] border p-2 transition-transform',
-                    isCorner ? 'p-3' : '',
-                    cellStyle,
-                  ].join(' ')}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-[0.25em] opacity-70">{displayIndex}</p>
-                      <p className={`${isCorner ? 'text-sm' : 'text-[11px]'} mt-1 font-black uppercase leading-tight`}>
-                        {cell.label}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-black/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em]">
-                      {cell.type}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 space-y-2">
-                    <p className="text-[10px] opacity-80">
-                      {cell.points === 0 ? 'Спец-клетка' : `База: ${cell.points} очк.`}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {here.length > 0 ? here.map((player) => (
-                        <span
-                          key={player.id}
-                          className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                            player.isActivePlayer
-                              ? 'bg-cyan-300 text-zinc-950'
-                              : 'bg-pink-500/20 text-pink-100'
-                          }`}
-                        >
-                          {player.displayName}
-                        </span>
-                      )) : <span className="text-[10px] opacity-40">Пусто</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="col-[3_/_11] row-[3_/_11] flex flex-col justify-between rounded-[2rem] border border-dashed border-zinc-700 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_35%),linear-gradient(180deg,_rgba(24,24,27,0.96),_rgba(9,9,11,0.98))] p-6">
-              <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">Igra board</p>
-                <h3 className="mt-2 text-4xl font-black uppercase leading-none text-white">Monopoly style</h3>
-                <p className="mt-4 max-w-md text-sm text-zinc-300">
-                  40 клеток по периметру: старт совмещён с финишем, на 10-й клетке тюрьма,
-                  на 20-й аукционная, на 30-й лотерея. Всё выглядит как настольное поле, а не просто сетка карточек.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-4">
-                  <p className="text-xs uppercase tracking-[0.25em] text-cyan-200">Сейчас ходит</p>
-                  <p className="mt-2 text-xl font-black">{activePlayer.displayName}</p>
-                  <p className="mt-1 text-sm text-zinc-300">Позиция: клетка {activePlayer.boardPosition}</p>
-                </div>
-                <div className="rounded-2xl border border-pink-500/30 bg-pink-500/10 p-4">
-                  <p className="text-xs uppercase tracking-[0.25em] text-pink-200">Ключевые углы</p>
-                  <p className="mt-2 text-sm text-zinc-200">0/40 — Старт, 10 — Тюрьма, 20 — Аукционная, 30 — Лотерея.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="mt-6">
+          <PerimeterBoard board={board} players={players} activePlayer={activePlayer} seasonName={season.name} />
         </div>
       </Card>
       <Card>
@@ -212,7 +109,7 @@ export function BoardView() {
           <Button variant="ghost">Win</Button>
           <Button variant="danger">Drop</Button>
         </div>
-        <p className="mt-4 text-xs text-zinc-500">Теперь поле визуально повторяет настолку: длинные рёбра, жирные углы и отдельный центр под сезонную инфу.</p>
+        <p className="mt-4 text-xs text-zinc-500">Фишки игроков вынесены наружу у внешней кромки клетки и привязаны к ней маленьким хвостиком, так что текст внутри поля больше не конфликтует с маркерами.</p>
       </Card>
     </div>
   );
