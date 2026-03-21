@@ -5,6 +5,9 @@ import { defaultWheel, defaultWheelEntries } from '../../../prisma/seed-data.ts'
 
 export async function ensurePlayerSeasonState(userId: string) {
   const season = await getCurrentSeason();
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!user) return null;
+
   return prisma.playerSeasonState.upsert({
     where: { userId_seasonId: { userId, seasonId: season.id } },
     update: {},
