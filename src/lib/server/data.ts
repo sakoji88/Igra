@@ -1,9 +1,71 @@
 import { prisma } from '@/lib/prisma';
 import { getCurrentSeason } from '@/lib/server/auth';
 import { getSideBasePoints } from '@/lib/server/board';
+import { defaultWheel, defaultWheelEntries } from '../../../prisma/seed-data.ts';
+
+export async function ensurePlayerSeasonState(userId: string) {
+  const season = await getCurrentSeason();
+  return prisma.playerSeasonState.upsert({
+    where: { userId_seasonId: { userId, seasonId: season.id } },
+    update: {},
+    create: {
+      userId,
+      seasonId: season.id,
+      boardPosition: 0,
+      score: 0,
+      availableWheelSpins: 3,
+    },
+  });
+}
+
+export async function ensureActiveWheelDefinition(): Promise<Awaited<ReturnType<typeof prisma.wheelDefinition.findFirst>> & { entries: Array<any> }> {
+  const season = await getCurrentSeason();
+  const existing = await prisma.wheelDefinition.findFirst({
+    where: { seasonId: season.id, active: true },
+    include: { entries: { where: { active: true }, include: { itemDefinition: true } } },
+  });
+  if (existing) return existing as Awaited<ReturnType<typeof ensureActiveWheelDefinition>>;
+
+  const itemDefinitions = await prisma.itemDefinition.findMany();
+  const itemByNumber = new Map(itemDefinitions.map((item) => [item.number, item.id]));
+  const wheel = await prisma.wheelDefinition.create({
+    data: {
+      seasonId: season.id,
+      name: defaultWheel.name,
+      description: defaultWheel.description,
+      imageUrl: defaultWheel.imageUrl,
+      active: true,
+      entries: {
+        create: defaultWheelEntries.map((entry) => ({
+          label: entry.label,
+          description: entry.description,
+          rewardType: entry.rewardType,
+          itemDefinitionId: entry.rewardType === 'ITEM' && entry.itemNumber ? itemByNumber.get(entry.itemNumber) ?? null : null,
+          rewardSpins: null,
+          weight: entry.weight,
+          imageUrl: entry.imageUrl,
+          active: entry.active,
+        })),
+      },
+    },
+    include: { entries: { where: { active: true }, include: { itemDefinition: true } } },
+  });
+
+  await prisma.eventLog.create({
+    data: {
+      seasonId: season.id,
+      type: 'SYSTEM',
+      summary: `Автоматически создано активное колесо «${wheel.name}».`,
+      payload: { wheelId: wheel.id, autoCreated: true },
+    },
+  });
+
+  return wheel as Awaited<ReturnType<typeof ensureActiveWheelDefinition>>;
+}
 
 export async function getCurrentUserState(userId: string) {
   const season = await getCurrentSeason();
+  await ensurePlayerSeasonState(userId);
   return prisma.playerSeasonState.findUnique({
     where: { userId_seasonId: { userId, seasonId: season.id } },
     include: {
@@ -70,7 +132,7 @@ export async function getDashboardData() {
   const [states, logs, wheel] = await Promise.all([
     prisma.playerSeasonState.findMany({ where: { seasonId: season.id, user: { role: 'PLAYER' } }, include: { user: { include: { profile: true } } }, orderBy: { score: 'desc' } }),
     prisma.eventLog.findMany({ where: { seasonId: season.id }, orderBy: { createdAt: 'desc' }, take: 8 }),
-    prisma.wheelDefinition.findFirst({ where: { seasonId: season.id, active: true }, include: { entries: { where: { active: true } } } }),
+    ensureActiveWheelDefinition(),
   ]);
   return { season, states, logs, wheel };
 }
@@ -104,14 +166,14 @@ export async function getItemsCatalog() {
 export async function getWheelPageData(userId: string) {
   const season = await getCurrentSeason();
   const [state, wheel, logs] = await Promise.all([
-    prisma.playerSeasonState.findUnique({
+    ensurePlayerSeasonState(userId).then(() => prisma.playerSeasonState.findUnique({
       where: { userId_seasonId: { userId, seasonId: season.id } },
       include: {
         user: { include: { profile: true } },
         wheelSpins: { include: { wheelEntry: { include: { itemDefinition: true } } }, orderBy: { createdAt: 'desc' }, take: 8 },
       },
-    }),
-    prisma.wheelDefinition.findFirst({ where: { seasonId: season.id, active: true }, include: { entries: { where: { active: true }, include: { itemDefinition: true } } } }),
+    })),
+    ensureActiveWheelDefinition(),
     prisma.eventLog.findMany({ where: { seasonId: season.id, type: 'WHEEL', userId }, orderBy: { createdAt: 'desc' }, take: 8 }),
   ]);
 

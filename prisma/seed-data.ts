@@ -31,8 +31,8 @@ export const defaultItemDefinitions = contentItemDefinitions.map((item) => ({
 }));
 
 export const defaultWheel = {
-  name: 'Колесо мемных артефактов',
-  description: 'Основное колесо сезона. Сервер выбирает результат по весам, клиент анимируется под уже выбранный сектор.',
+  name: 'Колесо приколов',
+  description: 'Актуальное колесо сезона с предметами и событиями. Все видят колесо, а сервер тратит крутки владельца и сохраняет выпавший сектор.',
   imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80',
   active: true,
 };

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { pickWeightedValue } from '@/lib/domain/game';
+import { ensureActiveWheelDefinition } from '@/lib/server/data';
 import { grantItemToState } from '@/lib/server/items';
 
 export async function spinWheelForState(playerSeasonStateId: string) {
@@ -10,11 +11,7 @@ export async function spinWheelForState(playerSeasonStateId: string) {
   if (!state) throw new Error('Состояние игрока не найдено.');
   if (state.availableWheelSpins <= 0) throw new Error('Нет доступных спинов.');
 
-  const wheel = await prisma.wheelDefinition.findFirst({
-    where: { seasonId: state.seasonId, active: true },
-    include: { entries: { where: { active: true }, include: { itemDefinition: true } } },
-    orderBy: { updatedAt: 'desc' },
-  });
+  const wheel = await ensureActiveWheelDefinition();
   if (!wheel || wheel.entries.length === 0) throw new Error('Активное колесо не настроено.');
 
   const selected = pickWeightedValue<typeof wheel.entries[number]>(wheel.entries);
@@ -101,14 +98,17 @@ export async function grantThreeWheelSpins(params: {
     const receiverState = await tx.playerSeasonState.findUnique({ where: { userId_seasonId: { userId: receiverUserId, seasonId } }, include: { user: true } });
     if (!giverState || !receiverState) throw new Error('Не удалось найти игроков сезона.');
 
-    await tx.playerSeasonState.update({ where: { id: receiverState.id }, data: { availableWheelSpins: { increment: 3 } } });
+    const nextSpins = Math.min(6, receiverState.availableWheelSpins + 3);
+    if (nextSpins === receiverState.availableWheelSpins) throw new Error('У получателя уже максимум круток.');
+
+    await tx.playerSeasonState.update({ where: { id: receiverState.id }, data: { availableWheelSpins: nextSpins } });
     const grant = await tx.wheelSpinGrant.create({
       data: {
         seasonId,
         giverStateId: giverState.id,
         receiverStateId: receiverState.id,
         runAssignmentId: run.id,
-        spinsGranted: 3,
+        spinsGranted: nextSpins - receiverState.availableWheelSpins,
       },
     });
     await tx.runAssignment.update({ where: { id: run.id }, data: { wheelSpinsGrantedAt: new Date() } });
@@ -117,8 +117,8 @@ export async function grantThreeWheelSpins(params: {
         seasonId,
         userId: giverUserId,
         type: 'WHEEL',
-        summary: `${giverState.user.nickname} подарил ${receiverState.user.nickname} три спина колеса за ран ${run.slotName}.`,
-        payload: { runId: run.id, grantId: grant.id, receiverUserId, spinsGranted: 3 },
+        summary: `${giverState.user.nickname} подарил ${receiverState.user.nickname} крутки колеса за ран ${run.slotName}.`,
+        payload: { runId: run.id, grantId: grant.id, receiverUserId, spinsGranted: grant.spinsGranted, cappedAtSix: true },
       },
     });
     return grant;

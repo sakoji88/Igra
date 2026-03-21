@@ -50,6 +50,7 @@ export default async function RegisterPage() {
                     seasonId: season.id,
                     boardPosition: 0,
                     score: 0,
+                    availableWheelSpins: 3,
                   },
                 },
               },

@@ -78,7 +78,7 @@ async function main() {
       description: entry.description,
       rewardType: entry.rewardType,
       itemDefinitionId: entry.rewardType === 'ITEM' ? itemByNumber.get(entry.itemNumber!) ?? null : null,
-      rewardSpins: 'rewardSpins' in entry ? entry.rewardSpins ?? null : null,
+      rewardSpins: null,
       weight: entry.weight,
       imageUrl: entry.imageUrl,
       active: entry.active,

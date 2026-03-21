@@ -1,14 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyEffects, calculateScore, moveOnBoard, pickWeightedValue, roll2d6, transitionAssignment } from '../src/lib/domain/game.ts';
-import { resolveConditionSelectionEffects, resolveRollEffects, resolveScoreEffects } from '../src/lib/domain/effect-engine.ts';
+import { resolveActiveGameEffects, resolveConditionSelectionEffects, resolveRollEffects } from '../src/lib/domain/effect-engine.ts';
 
 const runtimeItems = [
-  { inventoryItemId: 'i1', chargesCurrent: 1, itemDefinition: { id: '1', number: 1, name: 'Лёгкие глаза', type: 'BUFF' as const } },
-  { inventoryItemId: 'i2', chargesCurrent: 1, itemDefinition: { id: '2', number: 2, name: 'Проклятие слепой повязки', type: 'DEBUFF' as const } },
-  { inventoryItemId: 'i6', chargesCurrent: 1, itemDefinition: { id: '6', number: 6, name: 'Токсичный спойлер', type: 'TRAP' as const } },
-  { inventoryItemId: 'i7', chargesCurrent: 1, itemDefinition: { id: '7', number: 7, name: 'Чистый реролл вайба', type: 'NEUTRAL' as const } },
-  { inventoryItemId: 'i3', chargesCurrent: 1, itemDefinition: { id: '3', number: 3, name: 'Чилловый плейлист', type: 'BUFF' as const } },
+  { inventoryItemId: 'i14', chargesCurrent: 2, itemDefinition: { id: '14', number: 14, name: 'Тухлая шаурма', type: 'TRAP' as const } },
+  { inventoryItemId: 'i16', chargesCurrent: 1, itemDefinition: { id: '16', number: 16, name: 'Чокер боли', type: 'TRAP' as const } },
+  { inventoryItemId: 'i4', chargesCurrent: 2, itemDefinition: { id: '4', number: 4, name: 'Повязка Рэмбо', type: 'DEBUFF' as const } },
 ];
 
 test('roll and move around board', () => {
@@ -55,18 +53,18 @@ test('weighted wheel selection is server-deterministic for a provided random val
 test('effect engine resolves roll modifiers deterministically', () => {
   const result = resolveRollEffects({ items: runtimeItems, die1: 2, die2: 3 });
   assert.equal(result.rawRollTotal, 5);
-  assert.equal(result.finalMoveTotal, 7);
-  assert.deepEqual(result.consumedItemIds.sort(), ['i1', 'i2', 'i7'].sort());
+  assert.equal(result.finalMoveTotal, 3);
+  assert.deepEqual(result.consumedItemIds, ['i14']);
 });
 
-test('effect engine enforces condition locks', () => {
+test('effect engine enforces genre-only condition locks', () => {
   const result = resolveConditionSelectionEffects(runtimeItems);
-  assert.equal(result.lockedConditionType, 'BASE');
-  assert.deepEqual(result.consumedItemIds, ['i6']);
+  assert.equal(result.lockedConditionType, 'GENRE');
+  assert.deepEqual(result.consumedItemIds, ['i16']);
 });
 
-test('effect engine applies active-game score modifiers', () => {
-  const result = resolveScoreEffects({ items: runtimeItems, baseScore: 4 });
-  assert.equal(result.finalScore, 5);
-  assert.deepEqual(result.consumedItemIds, ['i3']);
+test('effect engine exposes active-game notes for manual items', () => {
+  const result = resolveActiveGameEffects(runtimeItems);
+  assert.equal(result.length, 1);
+  assert.equal(result[0]?.itemName, 'Повязка Рэмбо');
 });

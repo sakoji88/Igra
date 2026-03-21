@@ -39,10 +39,16 @@ export type ContentItemDefinition = {
   imageUrl: string;
   chargesDefault: number;
   allowedTargets: string;
+  targetType: string;
+  duration: string;
   conflictKey: string | null;
   active: boolean;
   manualReview: boolean;
   rawTextSource: string;
+  sourceType: 'DOCS';
+  stackable: boolean;
+  consumable: boolean;
+  priority: number;
   mechanics: ItemEffectConfig[];
 };
 
@@ -56,112 +62,205 @@ export type RuleSectionContent = {
   content: string;
 };
 
-export const coreRuleSections: RuleSectionContent[] = [
-  {
-    slug: 'core-turn-flow',
-    title: 'Поток хода игрока',
-    order: 1,
-    published: true,
-    manualReview: true,
-    rawTextSource: 'Собрано из текущих seed-данных и docs/domain-rules.md, потому что docs/rules-and-items.md отсутствует в checkout.',
-    content: 'Игрок ходит только если у него нет активной игры. Ход начинается с броска двух d6, затем сервер применяет все автоматические эффекты предметов, рассчитывает итоговое перемещение, двигает фишку и только после этого разрешает клетку. На игровой клетке игрок выбирает тип условий и сразу фиксирует активную игру для профиля.',
-  },
-  {
-    slug: 'active-game-lock',
-    title: 'Активная игра блокирует новый бросок',
-    order: 2,
-    published: true,
-    manualReview: true,
-    rawTextSource: 'Собрано из требований задачи и текущей логики активного рана.',
-    content: 'Пока активная игра не завершена, не дропнута и не очищена судьёй или админом, новый бросок запрещён и в интерфейсе, и на сервере. Профиль и поле обязаны показывать, какая именно игра сейчас блокирует следующий ход.',
-  },
-  {
-    slug: 'conditions-and-assignment',
-    title: 'Условия и назначение игры',
-    order: 3,
-    published: true,
-    manualReview: true,
-    rawTextSource: 'Собрано из seed-правил и пользовательского задания.',
-    content: 'После перемещения игрок сначала читает последствия клетки, затем выбирает Base или Genre условия, если клетка это допускает. Сразу после выбора открывается следующий шаг: ссылка на настройки GameGauntlets и форма, в которой игрок фиксирует назначенную игру. Эта запись становится активной игрой сезона.',
-  },
-  {
-    slug: 'items-and-effects',
-    title: 'Предметы и автоматические эффекты',
-    order: 4,
-    published: true,
-    manualReview: true,
-    rawTextSource: 'Собрано из seed-данных, docs/domain-rules.md и требований к effect pipeline.',
-    content: 'Предметы обрабатываются по стадиям: before_roll, after_roll, before_move, after_move, before_condition_select, after_condition_select, on_game_assigned, while_game_active и on_score_calculation. Эффекты применяются в детерминированном порядке по приоритету, показываются в разборе хода и могут автоматически тратиться, если так описано в их конфиге.',
-  },
-  {
-    slug: 'wheel-and-inventory',
-    title: 'Колесо, инвентарь и конфликты',
-    order: 5,
-    published: true,
-    manualReview: true,
-    rawTextSource: 'Собрано из docs/domain-rules.md и seed-описаний колеса.',
-    content: 'Колесо определяется сервером, а клиент только анимирует уже выбранный сектор. Награды попадают в инвентарь игрока или аннигилируются при конфликте по conflictKey. Завершённый ран один раз позволяет подарить другому игроку три спина колеса.',
-  },
-  {
-    slug: 'score-resolution',
-    title: 'Подсчёт очков',
-    order: 6,
-    published: true,
-    manualReview: true,
-    rawTextSource: 'Собрано из docs/domain-rules.md и текущей доменной логики.',
-    content: 'Очки всегда считаются на сервере. Базовая стоимость стороны поля умножается на 2 для Genre-условий, а затем к результату применяются эффекты предметов стадии on_score_calculation. Если ход замкнул круг, бонус за проход через старт тоже считается сервером.',
-  },
-];
+const rawTextSource = 'docs/rules-and-items.md';
+
+function itemImage(number: number) {
+  return `https://placehold.co/320x320/18181b/f8fafc?text=UPG+${number}`;
+}
+
+function makeItem(params: {
+  number: number;
+  name: string;
+  type: ContentItemDefinition['type'];
+  description: string;
+  chargesDefault?: number;
+  allowedTargets?: string;
+  conflictKey?: string | null;
+  duration?: string;
+  shortLabel?: string;
+  mechanics?: ItemEffectConfig[];
+}) {
+  return {
+    id: `item-${params.number}`,
+    number: params.number,
+    name: params.name,
+    type: params.type,
+    description: params.description,
+    shortLabel: params.shortLabel ?? params.name,
+    imageUrl: itemImage(params.number),
+    chargesDefault: params.chargesDefault ?? 1,
+    allowedTargets: params.allowedTargets ?? 'self',
+    targetType: params.allowedTargets ?? 'self',
+    duration: params.duration ?? 'manual',
+    conflictKey: params.conflictKey ?? null,
+    active: true,
+    manualReview: false,
+    rawTextSource,
+    sourceType: 'DOCS' as const,
+    stackable: false,
+    consumable: false,
+    priority: 50,
+    mechanics: params.mechanics ?? [],
+  } satisfies ContentItemDefinition;
+}
+
+function manualNote(id: string, text: string): ItemEffectConfig {
+  return {
+    id,
+    triggerStage: 'while_game_active',
+    effectType: 'active_game_note',
+    value: text,
+    priority: 10,
+    stackable: false,
+    oneTime: false,
+    consumption: 'manual',
+    applicationText: text,
+  };
+}
 
 export const glossaryEntries = [
-  { term: 'Активная игра', description: 'Текущая назначенная игра игрока. Пока она активна, новый бросок запрещён.', manualReview: true },
-  { term: 'Base', description: 'Базовые условия клетки. Обычно дают базовую стоимость стороны поля.', manualReview: true },
-  { term: 'Genre', description: 'Жанровые условия клетки. Обычно дают x2 к базовой стоимости стороны поля.', manualReview: true },
-  { term: 'Разбор хода', description: 'Человеко-читаемый список: исходный бросок, активные предметы, модификаторы и итоговое перемещение.', manualReview: true },
-  { term: 'Эффект стадии', description: 'Правило предмета, которое срабатывает в конкретный момент пайплайна хода или активной игры.', manualReview: true },
+  { term: 'Бафф', description: 'Предмет или событие с положительным эффектом.', manualReview: false },
+  { term: 'Дебафф', description: 'Предмет или событие с отрицательным эффектом.', manualReview: false },
+  { term: 'Предмет с пометкой «дебафф»', description: 'Не может быть сброшен стримером по собственному желанию.', manualReview: false },
+  { term: 'Нейтральный', description: 'Предмет или событие с нейтральным или опциональным эффектом, который может быть положительным или отрицательным.', manualReview: false },
 ] as const;
 
 export const specialMechanics = [
-  { id: 'effect-pipeline', title: 'Пайплайн эффектов', description: 'Система последовательно обрабатывает активные предметы по стадиям и логирует все изменения в понятном виде.', manualReview: true },
-  { id: 'condition-lock', title: 'Блокировка типа условий', description: 'Некоторые эффекты могут ограничить следующий выбор условий только Base или только Genre. Ограничение применяется сервером и показывается на поле.', manualReview: true },
-  { id: 'active-game-score-effects', title: 'Эффекты активной игры', description: 'Часть предметов живёт до завершения активной игры и меняет финальный подсчёт очков или описание активного задания.', manualReview: true },
+  { id: 'mechanic-item-types', title: 'Виды предметов', description: 'Бафф усиливает стримера, дебафф мешает ему, нейтралка зависит от контекста, а ловушка может быть предметом или событием и передаваться другому участнику.', manualReview: false },
+  { id: 'mechanic-inventory-priority', title: 'Приоритет инвентаря', description: 'Дебаффы считаются сильнее баффов и нейтралок. При полном инвентаре замены и рероллы зависят от сочетания типов предметов в слотах.', manualReview: false },
+  { id: 'mechanic-wheel-visibility', title: 'Колесо приколов', description: 'Колесо видно всем, но крутить его можно только за доступные крутки игрока. После прохождения игры другой стример может выдать игроку ещё 3 крутки, а максимум хранения — 6.', manualReview: false },
+  { id: 'mechanic-server-authority', title: 'Серверное разрешение', description: 'Страница и API создают сезонное состояние и активное колесо автоматически, если они ещё не были подготовлены сидом.', manualReview: false },
 ] as const;
 
-export const contentItemDefinitions: ContentItemDefinition[] = [
-  {
-    id: 'easy-eyes', number: 1, name: 'Лёгкие глаза', type: 'BUFF', description: 'Следующий ход ощущается комфортнее: итоговое перемещение игрока увеличивается на 1.', shortLabel: '+1 ход', imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: 'eyes', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'easy-eyes-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: 1, priority: 80, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Лёгкие глаза добавляют +1 к итоговому перемещению.' }],
-  },
-  {
-    id: 'blindfold-curse', number: 2, name: 'Проклятие слепой повязки', type: 'DEBUFF', description: 'Следующий ход становится тяжелее: итоговое перемещение игрока уменьшается на 1.', shortLabel: '-1 ход', imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self,other', conflictKey: 'eyes', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'blindfold-curse-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: -1, priority: 85, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Проклятие слепой повязки отнимает 1 клетку от итогового перемещения.' }],
-  },
-  {
-    id: 'chill-playlist', number: 3, name: 'Чилловый плейлист', type: 'BUFF', description: 'Помогает держать темп до конца активной игры: после победы игрок получает +1 очко сверху.', shortLabel: '+1 очко', imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: 'focus', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'chill-playlist-active-tag', triggerStage: 'while_game_active', effectType: 'active_game_note', value: 'Чилловый плейлист помогает не тильтовать и обещает +1 очко за победу.', priority: 40, stackable: false, oneTime: false, consumption: 'on_run_resolved', applicationText: 'Чилловый плейлист активен до завершения текущей игры.' }, { id: 'chill-playlist-score', triggerStage: 'on_score_calculation', effectType: 'score_modifier', value: 1, priority: 70, stackable: false, oneTime: true, consumption: 'on_run_resolved', applicationText: 'Чилловый плейлист добавляет +1 очко к награде за активную игру.' }],
-  },
-  {
-    id: 'doomscroll-storm', number: 4, name: 'Думскролл-шторм', type: 'DEBUFF', description: 'Съедает концентрацию: завершённая игра приносит на 1 очко меньше.', shortLabel: '-1 очко', imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self,other', conflictKey: 'focus', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'doomscroll-active-tag', triggerStage: 'while_game_active', effectType: 'active_game_note', value: 'Думскролл-шторм мешает сконцентрироваться и готовит -1 очко при завершении.', priority: 45, stackable: false, oneTime: false, consumption: 'on_run_resolved', applicationText: 'Думскролл-шторм висит до конца активной игры.' }, { id: 'doomscroll-score', triggerStage: 'on_score_calculation', effectType: 'score_modifier', value: -1, priority: 75, stackable: false, oneTime: true, consumption: 'on_run_resolved', applicationText: 'Думскролл-шторм отнимает 1 очко от награды за игру.' }],
-  },
-  {
-    id: 'banana-mine', number: 5, name: 'Банановая мина', type: 'TRAP', description: 'Ловушка на следующий ход: игрок делает на 2 клетки меньше.', shortLabel: '-2 ход', imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'other', conflictKey: null, active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'banana-mine-move', triggerStage: 'before_move', effectType: 'move_modifier', value: -2, priority: 90, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Банановая мина заставляет потерять 2 клетки движения.' }],
-  },
-  {
-    id: 'toxic-spoiler', number: 6, name: 'Токсичный спойлер', type: 'TRAP', description: 'Следующее назначение можно взять только по Base-условиям.', shortLabel: 'Только Base', imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'other', conflictKey: null, active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'toxic-spoiler-lock', triggerStage: 'before_condition_select', effectType: 'condition_lock', value: 'BASE', priority: 95, stackable: false, oneTime: true, consumption: 'on_assignment_created', applicationText: 'Токсичный спойлер оставляет игроку только Base-условия для следующего назначения.' }],
-  },
-  {
-    id: 'clean-reroll-vibe', number: 7, name: 'Чистый реролл вайба', type: 'NEUTRAL', description: 'Если сумма двух d6 получилась 5 или меньше, предмет добавляет ещё +2 клетки движения.', shortLabel: '+2 при 5-', imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: null, active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'clean-reroll-vibe-move', triggerStage: 'after_roll', effectType: 'conditional_move_modifier', value: 2, priority: 60, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Чистый реролл вайба добавляет +2, потому что бросок был 5 или меньше.', conditions: { maxRawRoll: 5 } }],
-  },
+export const coreRuleSections: RuleSectionContent[] = [
+  { slug: 'goal', title: '2.1 Общая цель', order: 1, published: true, manualReview: false, rawTextSource, content: 'Стримеры соревнуются на игровом поле и пытаются заработать как можно больше поинтов. Забег длится 14 дней. Победителем становится тот, у кого больше всего поинтов по истечении 14 дней. Победитель получает nothing.' },
+  { slug: 'turn-rules', title: '2.2 Правила хода', order: 2, published: true, manualReview: false, rawTextSource, content: 'Каждый стример бросает два кубика d6. Выпавшее значение — количество клеток, которое он проходит. Чтобы совершить следующий ход, в большинстве случаев нужно пройти игру на клетке остановки по указанным условиям или выбрать альтернативные условия для удвоенного количества поинтов. Стример не ждёт других участников: как только игра пройдена или условие клетки выполнено, он может снова бросать кубики. Ограничений на ходы в день или неделю нет.' },
+  { slug: 'wheel-rules', title: '2.3 Колесо приколов', order: 3, published: true, manualReview: false, rawTextSource, content: 'В начале игры у всех есть по 3 крутки колеса. За каждую пройденную игру стример получает ещё 3 крутки, а максимум накопления — 6. Свои колёса стример сам не крутит: он просит другого стримера крутить его крутки, но списываются они у владельца. За один ход можно прокрутить максимум 6 колёс. Предметы попадают в инвентарь, где максимум 6 слотов. Если событие нельзя применить, выполняется реролл колеса.' },
+  { slug: 'reroll-rules', title: '2.4 Правила реролла игр', order: 4, published: true, manualReview: false, rawTextSource, content: 'Легитимный реролл возможен для игр без концовки, VR-игр, проектов с техническими проблемами захвата, DLC без основы, игр с некорректной ценой, игр без допустимого языка или стриминга, повторов в допустимых сезонах, visual novels и текстовых RPG, раннего доступа в первые 30 минут, сборников и спортивных / гоночных симуляторов по указанным оговоркам.' },
+  { slug: 'completion-rules', title: '2.5 Игра считается пройденной, если', order: 5, published: true, manualReview: false, rawTextSource, content: 'Прохождение засчитывается при достижении финала, альтернативной валидной концовки, выполнении требований для бессюжетных игр с уровнями, побитии High Score там, где это основной критерий, а также по отдельным договорённостям для rogue-like, стратегий с несколькими кампаниями и игр с несколькими историями. Если есть сомнения в честности зачёта, вопрос нужно заранее обсудить с другими участниками.' },
+  { slug: 'bans', title: '2.6 Запреты', order: 6, published: true, manualReview: false, rawTextSource, content: 'Запрещено использование чит-кодов, трейнеров и сторонних программ, облегчающих прохождение. Баги и гличи на скип уровней разрешены.' },
+  { slug: 'difficulty', title: '2.7 Сложность', order: 7, published: true, manualReview: false, rawTextSource, content: 'По умолчанию используется стандартная сложность, предлагаемая игрой. Если игру нужно настраивать вручную, стример выбирает сложность сам, но не самый лёгкий режим и его аналоги. Если вместо сложности есть режимы, выбирается их аналог, а спорные случаи обсуждаются отдельно. Настройки, влияющие на сложность прохождения, запрещены.' },
+  { slug: 'drop', title: '2.8 Дроп', order: 8, published: true, manualReview: false, rawTextSource, content: 'При дропе игры стример отправляется в Тюрьму и проходит там игру по правилам клетки. При дропе прямо на клетке Тюрьма стример теряет 2 поинта. Уход в минус по поинтам разрешён.' },
+  { slug: 'inventory', title: '2.9 Инвентарь', order: 9, published: true, manualReview: false, rawTextSource, content: 'Каждый стример может носить максимум 6 предметов. Увеличить или уменьшить размер инвентаря никакими способами нельзя.' },
+  { slug: 'watching-guides', title: '2.10 Просмотр прохождения', order: 10, published: true, manualReview: false, rawTextSource, content: 'Смотреть прохождение игры запрещено. Подсказки из чата разрешены, если это не копипаста гайдов, не помощь со спидранными абузами и не искажение честного прохождения.' },
+  { slug: 'unexpected-cases', title: '2.11 Непредвиденные моменты', order: 11, published: true, manualReview: false, rawTextSource, content: 'Любые непредвиденные моменты, не прописанные в правилах, решаются стримером по его усмотрению при отсутствии свидетелей.' },
+  { slug: 'event-drop', title: '2.12 Дроп ивента', order: 12, published: true, manualReview: false, rawTextSource, content: 'Если один из стримеров дропает ивент, то он какашка.' },
+  { slug: 'where-to-roll', title: '2.13 Где можно роллить', order: 13, published: true, manualReview: false, rawTextSource, content: 'Ролл игр производится только на известном стримерам сайте с роллом игр, колесо приколов — в Wheel of Pepega или аналогичном сайте, монетка и d6 кидаются в Google через coin flip и roll dice, а чатовые голосования проходят в Twitch через /poll.' },
+  { slug: 'goty-edition', title: '2.14 GOTY Edition', order: 14, published: true, manualReview: false, rawTextSource, content: 'Если выпадает GOTY-версия со всеми DLC, для зачёта достаточно пройти только основную игру без побочных DLC. Если кампании доступны сразу, хватает одной; если они открываются последовательно, нужно пройти все.' },
+  { slug: 'start-points-exceptions', title: '2.15 Когда не дают 5 поинтов за преодоление клетки «Старт»', order: 15, published: true, manualReview: false, rawTextSource, content: 'Бонус за Старт не начисляется в ситуациях с обратным движением, отменой прохождения Старт после возврата, а также при особых перемещениях между частями поля, где сам эффект не считается честным пересечением клетки. В спорных случаях нужно обращаться к судье.' },
+  { slug: 'leave-jail', title: '2.16 Как выйти из Тюрьмы после дропа', order: 16, published: true, manualReview: false, rawTextSource, content: 'Из Тюрьмы после дропа можно выйти либо за 3 поинта, пытаясь выбросить дублет на двух кубиках без модификаторов, либо коллективным побегом трёх и более стримеров раз в 24 часа. Во втором случае совпавший у всех бросок отправляет их на Naughty Boy, но замеченный судьёй побег карается штрафом в 2 поинта для всех заключённых.' },
 ];
 
-export const wheelEntriesContent = [
-  { label: 'Лёгкие глаза', description: 'Быстрый бафф на следующий ход.', rewardType: 'ITEM', itemNumber: 1, weight: 3, imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Проклятие слепой повязки', description: 'Дебафф на следующий ход.', rewardType: 'ITEM', itemNumber: 2, weight: 2, imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Чилловый плейлист', description: 'Помогает добрать очки за активную игру.', rewardType: 'ITEM', itemNumber: 3, weight: 3, imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Думскролл-шторм', description: 'Портит финальную награду за активную игру.', rewardType: 'ITEM', itemNumber: 4, weight: 2, imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Банановая мина', description: 'Ловушка на следующее перемещение.', rewardType: 'ITEM', itemNumber: 5, weight: 2, imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Токсичный спойлер', description: 'Следующее назначение только через Base.', rewardType: 'ITEM', itemNumber: 6, weight: 1, imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Чистый реролл вайба', description: 'Спасает плохой бросок и добавляет хода.', rewardType: 'ITEM', itemNumber: 7, weight: 2, imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: '+1 дополнительный спин', description: 'Колесо даёт ещё одну попытку.', rewardType: 'SPINS', rewardSpins: 1, weight: 1, imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
-  { label: 'Ничего, кроме вайба', description: 'Пустой сектор без награды, но с настроением.', rewardType: 'NOTHING', weight: 1, imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=400&q=80', active: true, manualReview: true },
+export const contentItemDefinitions: ContentItemDefinition[] = [
+  makeItem({ number: 1, name: 'Читерский кубик', type: 'BUFF', chargesDefault: 1, conflictKey: 'dice-rig', description: 'После броска кубиков заменяет значение на одном из них на то, которое выберет стример. За один ход можно использовать только один заряд.', mechanics: [manualNote('cheater-dice-note', 'После броска можно вручную подменить одно значение кубика.')]}),
+  makeItem({ number: 2, name: 'Кубик хуёбика', type: 'DEBUFF', chargesDefault: 1, conflictKey: 'dice-rig', description: 'После следующего броска кубиков большее значение меняется на 1.', mechanics: [manualNote('huebik-note', 'На следующем броске большее значение кубика вручную заменяется на 1.')]}),
+  makeItem({ number: 3, name: 'Очки EZ', type: 'BUFF', chargesDefault: 2, conflictKey: 'difficulty', description: 'Следующие два хода, не считая текущий, игры проходятся на самом лёгком уровне сложности.', mechanics: [manualNote('ez-glasses-note', 'Следующие две игры можно проходить на самом лёгком уровне сложности.')]}),
+  makeItem({ number: 4, name: 'Повязка Рэмбо', type: 'DEBUFF', chargesDefault: 2, conflictKey: 'difficulty', description: 'Следующие два хода, не считая текущий, игры проходятся на самом высоком уровне сложности.', mechanics: [manualNote('rambo-note', 'Следующие две игры нужно проходить на самой высокой сложности.')]}),
+  makeItem({ number: 5, name: 'Свиток реролла', type: 'BUFF', chargesDefault: 1, description: 'Позволяет сделать реролл игры и по желанию снять эффекты, влияющие на ролл колеса.', mechanics: [manualNote('reroll-scroll-note', 'Предмет даёт ручной реролл игры.')]}),
+  makeItem({ number: 6, name: 'Шар всезнания', type: 'BUFF', chargesDefault: 1, description: 'При использовании можно воспользоваться гайдом, видеопрохождением или спидраном игры.', mechanics: [manualNote('omniscience-note', 'Этот предмет вручную разрешает пользоваться гайдом или видеопрохождением.')]}),
+  makeItem({ number: 7, name: 'Взрывчатка', type: 'DEBUFF', chargesDefault: 2, description: 'При попытке использования положительных свойств предметов бросьте монетку. Заряд тратится в любом случае.', mechanics: [manualNote('explosives-note', 'Использование положительных свойств предметов требует ручной проверки монеткой.')]}),
+  makeItem({ number: 8, name: 'Корона колесного короля', type: 'BUFF', chargesDefault: 1, description: 'После прокрута колеса можно выбрать между двумя соседними играми. Не работает на Аукошной и Лотерее.', mechanics: [manualNote('crown-note', 'После ролла колеса можно вручную выбрать один из соседних пунктов.')]}),
+  makeItem({ number: 9, name: 'Ремонтный набор', type: 'BUFF', chargesDefault: 1, description: 'Увеличивает количество зарядов у любого вашего предмета на 1. Не работает на Шоколад.', mechanics: [manualNote('repair-kit-note', 'Можно вручную увеличить заряд выбранного предмета на 1.')]}),
+  makeItem({ number: 10, name: 'Красочная манга', type: 'BUFF', chargesDefault: 1, description: 'Позволяет проходить визуальную новеллу, но запрещает автоскип сцен.', mechanics: [manualNote('manga-note', 'Этот предмет вручную разрешает визуальные новеллы без автоскипа.')]}),
+  makeItem({ number: 11, name: 'Рука мидаса', type: 'NEUTRAL', chargesDefault: 3, description: 'Следующие три игры имеют обязательную стоимость от 15 долларов. Не работает на аукционной и лотерее.', mechanics: [manualNote('midas-note', 'Следующие три игры должны удовлетворять ценовому фильтру от 15 долларов.')]}),
+  makeItem({ number: 12, name: 'Реверсивные сапоги', type: 'DEBUFF', chargesDefault: 1, description: 'Во время следующего хода бросьте один кубик вместо двух и отступите назад на выпавшее значение.', mechanics: [manualNote('reverse-boots-note', 'Следующий ход выполняется вручную одним кубиком назад без дополнительных эффектов.')]}),
+  makeItem({ number: 13, name: 'Парные кольца времени', type: 'BUFF', chargesDefault: 4, description: 'Связывает двух стримеров общими зарядами и уменьшает временные условия на 2 часа при использовании.', mechanics: [manualNote('rings-note', 'Предмет требует ручного связывания двух игроков и общего счётчика зарядов.')]}),
+  makeItem({ number: 14, name: 'Тухлая шаурма', type: 'TRAP', chargesDefault: 2, allowedTargets: 'other', description: 'Следующие два хода цель отнимает от каждого значения кубика 1. Значение на кубике не может быть меньше 1.', mechanics: [{ id: 'shawarma-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: -2, priority: 80, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Тухлая шаурма уменьшает следующий бросок на 2 клетки суммарно.' }]}),
+  makeItem({ number: 15, name: 'Четырёхлистный клевер', type: 'BUFF', chargesDefault: 1, description: 'Можно отбить любую ловушку. На Аукционе и Лотерее можно договориться на +2 поинта или пройти игру на лёгком уровне сложности.', mechanics: [manualNote('clover-note', 'Клевер вручную отражает ловушку или даёт особый бонус на Аукционе и Лотерее.')]}),
+  makeItem({ number: 16, name: 'Чокер боли', type: 'TRAP', chargesDefault: 1, allowedTargets: 'other', description: 'Во время следующего прохождения игры на обычной клетке цель может проходить её только по жанровым правилам.', mechanics: [{ id: 'pain-choker-lock', triggerStage: 'before_condition_select', effectType: 'condition_lock', value: 'GENRE', priority: 95, stackable: false, oneTime: true, consumption: 'on_assignment_created', applicationText: 'Чокер боли заставляет выбрать только жанровые условия.' }]}),
+  makeItem({ number: 17, name: 'Полукаловая монета', type: 'TRAP', chargesDefault: 1, allowedTargets: 'other', description: 'На следующей клетке с временным условием цель подбрасывает монетку: одна сторона даёт -2 часа, вторая +3 часа.', mechanics: [manualNote('coin-note', 'Эффект временного окна определяется вручную монеткой на следующей подходящей клетке.')]}),
+  makeItem({ number: 18, name: 'Шоколад', type: 'BUFF', chargesDefault: 1, description: 'Уменьшает верхнее и нижнее значение времени на клетке на 1 час и может копиться до плитки.', mechanics: [manualNote('chocolate-note', 'Шоколад вручную меняет временные рамки клетки и умеет копиться до плитки.')]}),
+  makeItem({ number: 19, name: 'Туалетка', type: 'BUFF', chargesDefault: 1, description: 'При дропе вместо Тюрьмы возвращает на клетку предыдущего хода. Не может заблокировать эффект Дырявого парашюта.', mechanics: [manualNote('toilet-note', 'При дропе можно вручную вернуться на предыдущую клетку вместо Тюрьмы.')]}),
+  makeItem({ number: 20, name: 'Штрафная квитанция', type: 'DEBUFF', chargesDefault: 1, description: 'На следующей клетке с временем повышает верхний и нижний порог на 3 часа.', mechanics: [manualNote('fine-note', 'Следующее временное условие нужно вручную увеличить на 3 часа.')]}),
+  makeItem({ number: 21, name: 'Дырявый парашют', type: 'DEBUFF', chargesDefault: 1, description: 'При дропе перемещает на Старт и повышает временные пороги на 3 часа.', mechanics: [manualNote('parachute-note', 'При дропе вручную переносит игрока на Старт и увеличивает временные пороги.')]}),
+  makeItem({ number: 22, name: 'Наперсток удачи', type: 'BUFF', chargesDefault: 1, description: 'Перед каждым роллом колеса позволяет заменить один нежелательный сектор на нужный.', mechanics: [manualNote('thimble-note', 'Перед прокрутом колеса можно вручную объявить замену одного сектора.')]}),
+  makeItem({ number: 23, name: 'Рука для fisting', type: 'TRAP', chargesDefault: 5, allowedTargets: 'other', description: 'Делает другого стримера slave: каждый пятый заработанный им point уходит владельцу предмета до суммарной выплаты 5 поинтов.', mechanics: [manualNote('fisting-note', 'Предмет требует ручного учёта передачи поинтов между двумя игроками.')]}),
+  makeItem({ number: 24, name: 'Тотем мощны', type: 'BUFF', chargesDefault: 2, description: 'Защищает на текущий и следующий ход от ловушек-событий.', mechanics: [manualNote('totem-note', 'Тотем вручную защищает игрока от ловушек-событий на текущий и следующий ход.')]}),
+  makeItem({ number: 25, name: 'Плюсовый блокнот', type: 'BUFF', chargesDefault: 1, description: 'Если оба кубика совпали, даёт +2 к движению. На двух шестёрках вместо этого даёт +1 поинт.', mechanics: [manualNote('notebook-note', 'При дубле бонус рассчитывается вручную: +2 к движению, а на двух шестёрках — +1 поинт.')]}),
+];
+
+const wheelEntryBase = [
+  ['ITEM', 1, 'Читерский кубик', 'После броска кубиков позволяет подменить одно значение.'],
+  ['ITEM', 2, 'Кубик хуёбика', 'Превращает большее значение следующего броска в единицу.'],
+  ['ITEM', 3, 'Очки EZ', 'Следующие две игры можно проходить на самом лёгком уровне сложности.'],
+  ['ITEM', 4, 'Повязка Рэмбо', 'Следующие две игры нужно проходить на самой высокой сложности.'],
+  ['ITEM', 5, 'Свиток реролла', 'Даёт ручной реролл игры и может снять эффекты ролла.'],
+  ['ITEM', 6, 'Шар всезнания', 'Разрешает воспользоваться гайдом, прохождением или спидраном.'],
+  ['ITEM', 7, 'Взрывчатка', 'Положительные эффекты предметов зависят от монетки.'],
+  ['ITEM', 8, 'Корона колесного короля', 'После ролла позволяет выбрать один из соседних пунктов.'],
+  ['ITEM', 9, 'Ремонтный набор', 'Увеличивает заряд любого вашего предмета на 1.'],
+  ['ITEM', 10, 'Красочная манга', 'Разрешает визуальные новеллы без автоскипа сцен.'],
+  ['ITEM', 11, 'Рука мидаса', 'Три следующие игры должны стоить от 15 долларов.'],
+  ['ITEM', 12, 'Реверсивные сапоги', 'Следующий ход проходит одним кубиком назад.'],
+  ['ITEM', 13, 'Парные кольца времени', 'Связывают двух игроков и уменьшают временные рамки.'],
+  ['ITEM', 14, 'Тухлая шаурма', 'Ловушка: уменьшает следующие два хода цели.'],
+  ['ITEM', 15, 'Четырёхлистный клевер', 'Отбивает ловушки и даёт особый бонус на аукционе или лотерее.'],
+  ['ITEM', 16, 'Чокер боли', 'Ловушка: заставляет цель играть только по жанровым условиям.'],
+  ['ITEM', 17, 'Полукаловая монета', 'Ловушка: следующая временная клетка цели решается монеткой.'],
+  ['ITEM', 18, 'Шоколад', 'Понижает временные рамки и копится до плитки.'],
+  ['ITEM', 19, 'Туалетка', 'При дропе возвращает на предыдущую клетку вместо Тюрьмы.'],
+  ['ITEM', 20, 'Штрафная квитанция', 'Повышает временные рамки следующей клетки на 3 часа.'],
+  ['ITEM', 21, 'Дырявый парашют', 'При дропе отправляет на Старт и повышает временные пороги.'],
+  ['ITEM', 22, 'Наперсток удачи', 'Позволяет заранее заменить один сектор колеса.'],
+  ['ITEM', 23, 'Рука для fisting', 'Ловушка: забирает каждый пятый point у цели.'],
+  ['ITEM', 24, 'Тотем мощны', 'Защищает от ловушек-событий на текущий и следующий ход.'],
+  ['ITEM', 25, 'Плюсовый блокнот', 'Дает бонус на дублях при броске движения.'],
+  ['EVENT', null, 'Интрига', 'Реролл колеса.'],
+  ['EVENT', null, 'Два по цене одного', 'Реролл колеса и выполнение двух соседних пунктов.'],
+  ['EVENT', null, 'По магазинам с чатом', 'Реролл колеса с выбором через голосование чата.'],
+  ['EVENT', null, 'По магазинам с Лепреконом', 'Реролл колеса с выбором главного судьи или самого стримера.'],
+  ['EVENT', null, 'Однорукий бандит', 'Сбросьте весь инвентарь и прокрутите колесо за каждый сброшенный предмет.'],
+  ['EVENT', null, 'Грязнулькин', 'Съедает случайный бафф.'],
+  ['EVENT', null, 'Рокировочка', 'Меняет тип предмета с дебаффа на бафф и наоборот.'],
+  ['EVENT', null, 'Лепреконий схрон', 'Крутите только колесо баффов и положительных событий.'],
+  ['EVENT', null, 'Заначка Старыги', 'Крутите только колесо дебаффов и отрицательных событий.'],
+  ['EVENT', null, 'Стример не тупой', 'Ответьте на 7 случайных вопросов и получите от -2 до +2 поинтов.'],
+  ['EVENT', null, 'Аптечка', 'Сбросьте бафф или дебафф с изменением поинтов.'],
+  ['EVENT', null, 'Ой, извините', 'Выберите один из четырёх соседних пунктов.'],
+  ['EVENT', null, 'Mine now TriHard', 'Обменяйтесь инвентарями со случайным стримером.'],
+  ['EVENT', null, 'Помощь отстающему', 'Следующий бросок зависит от текущего места по поинтам.'],
+  ['EVENT', null, 'Удачный неудачник', 'Следующий бросок усиливается количеством дебаффов.'],
+  ['EVENT', null, 'Торопыга', 'Следующая временная клетка уменьшает рамки на 1 час.'],
+  ['EVENT', null, 'Бог любит троицу', 'Следующий ход выполняется тремя кубиками с выбором двух.'],
+  ['EVENT', null, 'Орел или решка', 'Монетка даёт +2 или -2 к следующему броску.'],
+  ['EVENT', null, 'А где это я?', 'Крутит колесо баффов или дебаффов в зависимости от клетки.'],
+  ['EVENT', null, 'Чат здесь закон', 'Следующий ролл игры идёт из 6 игр с выбором через чат.'],
+  ['EVENT', null, 'Я здесь закон', 'Следующий ролл игры идёт из 6 игр с личным выбором стримера.'],
+  ['EVENT', null, 'Выбор бумера', 'Следующий ролл игры ограничен датой до декабря 2010 года.'],
+  ['EVENT', null, 'Выбор зумера', 'Следующий ролл игры ограничен датой от января 2011 года.'],
+  ['EVENT', null, 'Мистер Ржавчик', 'Ловушка-событие: съедает у цели случайный бафф.'],
+  ['EVENT', null, 'Всепоглощающий свин', 'Ловушка-событие: съедает у цели случайный предмет.'],
+  ['EVENT', null, 'Грабли', 'Ловушка-событие: цель получает -1 к следующему броску движения.'],
+  ['EVENT', null, 'Липкая жижа', 'Ловушка-событие: цель получает -1 к броску и оставляет след на клетке.'],
+  ['EVENT', null, 'Тормознутый', 'Ловушка-событие: увеличивает временные пороги следующей клетки на 1 час.'],
+  ['EVENT', null, 'Крыса', 'Ловушка-событие: цель получает -3 к движению, а владелец -1.'],
+  ['EVENT', null, 'УВЫ', 'Жанровые условия дают обычные поинты, иначе выполняется реролл колеса.'],
+  ['EVENT', null, 'Часовой рост', 'Следующая временная клетка увеличивает рамки на 1 час.'],
 ] as const;
+
+export const wheelEntriesContent = wheelEntryBase.map((entry, index) => {
+  const [rewardType, itemNumber, label, description] = entry;
+  const linkedItem = itemNumber ? contentItemDefinitions.find((item) => item.number === itemNumber) ?? null : null;
+  return {
+    id: `wheel-${index + 1}`,
+    number: index + 1,
+    name: label,
+    fullText: label,
+    category: rewardType === 'ITEM' ? 'ITEM' : 'EVENT',
+    linkedItemId: linkedItem?.id ?? null,
+    linkedEffectId: null,
+    resultType: rewardType,
+    targetingRules: linkedItem?.targetType ?? null,
+    manualReview: false,
+    label,
+    description,
+    rewardType,
+    itemNumber: itemNumber ?? undefined,
+    weight: 1,
+    imageUrl: itemNumber ? itemImage(itemNumber) : `https://placehold.co/320x320/111827/f8fafc?text=Event+${index + 1}`,
+    active: true,
+  };
+});
 
 const itemsByNumber = new Map(contentItemDefinitions.map((item) => [item.number, item]));
 
