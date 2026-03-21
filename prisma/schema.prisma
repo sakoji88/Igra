@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  JUDGE
+  PLAYER
+}
+
+enum SlotType {
+  START
+  REGULAR
+  RANDOM
+  JAIL
+  LOTTERY
+  AUCTION
+  PODLYANKA
+  KAIFARIK
+  WHEEL
+}
+
+enum SlotSide {
+  BOTTOM
+  LEFT
+  TOP
+  RIGHT
+}
+
+enum ConditionType {
+  BASE
+  GENRE
+}
+
+enum RunStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+  DISPUTED
+  RESOLVED
+}
+
+enum ItemType {
+  BUFF
+  DEBUFF
+  TRAP
+  NEUTRAL
+}
+
+enum EventType {
+  SYSTEM
+  AUTH
+  TURN
+  RUN
+  ITEM
+  ADMIN
+  RULE
+}
+
+enum UpcomingEventStatus {
+  PLANNED
+  DONE
+  CANCELED
+}
+
+model User {
+  id           String              @id @default(cuid())
+  nickname     String              @unique
+  passwordHash String
+  avatarUrl    String?
+  role         Role                @default(PLAYER)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  profile      PlayerProfile?
+  seasonStates PlayerSeasonState[]
+  runs         RunAssignment[]
+  upcoming     UpcomingEvent[]
+  inventory    PlayerInventoryItem[]
+  logs         EventLog[]
+}
+
+model PlayerProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Season {
+  id        String              @id @default(cuid())
+  slug      String              @unique
+  name      String
+  isActive  Boolean             @default(false)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  states    PlayerSeasonState[]
+  boardSlots BoardSlot[]
+  runs      RunAssignment[]
+  logs      EventLog[]
+}
+
+model PlayerSeasonState {
+  id             String   @id @default(cuid())
+  userId         String
+  seasonId       String
+  score          Int      @default(0)
+  boardPosition  Int      @default(0)
+  lastDie1       Int?
+  lastDie2       Int?
+  lastRollTotal  Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season         Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, seasonId])
+}
+
+model BoardSlot {
+  id              String   @id @default(cuid())
+  seasonId        String
+  slotNumber      Int
+  name            String
+  type            SlotType
+  side            SlotSide
+  imageUrl        String?
+  imageFallback   String
+  baseConditions  String[]
+  genreConditions String[]
+  description     String?
+  isPlayable      Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  season          Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  runs            RunAssignment[]
+
+  @@unique([seasonId, slotNumber])
+}
+
+model RunAssignment {
+  id             String        @id @default(cuid())
+  userId         String
+  seasonId       String
+  slotId         String
+  slotNumber     Int
+  slotName       String
+  side           SlotSide
+  conditionType  ConditionType
+  expectedPoints Int
+  status         RunStatus     @default(ACTIVE)
+  assignedAt     DateTime      @default(now())
+  gameTitle      String?
+  gameUrl        String?
+  playerComment  String?
+  completedAt    DateTime?
+  droppedAt      DateTime?
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season         Season        @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  slot           BoardSlot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+}
+
+model UpcomingEvent {
+  id          String              @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  eventDate   DateTime?
+  status      UpcomingEventStatus @default(PLANNED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ItemDefinition {
+  id             String   @id @default(cuid())
+  number         Int      @unique
+  name           String
+  type           ItemType
+  description    String
+  imageUrl       String?
+  chargesDefault Int      @default(1)
+  allowedTargets String   @default("self")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  inventoryItems PlayerInventoryItem[]
+}
+
+model PlayerInventoryItem {
+  id               String         @id @default(cuid())
+  userId           String
+  itemDefinitionId String
+  charges          Int            @default(1)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemDefinition   ItemDefinition @relation(fields: [itemDefinitionId], references: [id], onDelete: Cascade)
+}
+
+model RuleSection {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String
+  order     Int      @default(0)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EventLog {
+  id        String    @id @default(cuid())
+  seasonId  String?
+  userId    String?
+  type      EventType
+  summary   String
+  payload   Json?
+  createdAt DateTime  @default(now())
+  season    Season?   @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
