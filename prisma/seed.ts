@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
-import { prisma } from '../src/lib/prisma';
-import { createBoardSlotSeed } from '../src/lib/server/board';
-import { currentSeason, defaultItemDefinitions, defaultRules, seedAdmin } from './seed-data';
+import { prisma } from '../src/lib/prisma.ts';
+import { createBoardSlotSeed } from '../src/lib/server/board.ts';
+import { currentSeason, defaultItemDefinitions, defaultRules, seedAdmin } from './seed-data.ts';
 
 async function main() {
   await prisma.playerInventoryItem.deleteMany();

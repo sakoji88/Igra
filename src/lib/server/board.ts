@@ -1,5 +1,5 @@
 import type { BoardSlot, SlotSide, SlotType } from '@prisma/client';
-import { boardCells } from '../../../prisma/seed-data';
+import { boardCells } from '../../../prisma/seed-data.ts';
 
 export function getSlotSide(slotNumber: number): SlotSide {
   if (slotNumber >= 0 && slotNumber <= 10) return 'BOTTOM';
