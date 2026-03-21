@@ -1,9 +1,130 @@
 [
-  {"id":"lyogkie-glaza","number":1,"name":"Лёгкие глаза","description":"Следующий ход ощущается комфортнее: итоговое перемещение игрока увеличивается на 1.","category":"BUFF","subcategory":"MOVE","charges":1,"triggerStages":["after_roll"],"effectType":"move_modifier","targetType":"self","duration":"next_trigger","stackable":false,"consumable":true,"priority":80,"conflictKey":"eyes","sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false},
-  {"id":"proklyatie-slepoy-povyazki","number":2,"name":"Проклятие слепой повязки","description":"Следующий ход становится тяжелее: итоговое перемещение игрока уменьшается на 1.","category":"DEBUFF","subcategory":"MOVE","charges":1,"triggerStages":["after_roll"],"effectType":"move_modifier","targetType":"self,other","duration":"next_trigger","stackable":false,"consumable":true,"priority":85,"conflictKey":"eyes","sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false},
-  {"id":"chillovyy-pleylist","number":3,"name":"Чилловый плейлист","description":"Помогает держать темп до конца активной игры: после победы игрок получает +1 очко сверху.","category":"BUFF","subcategory":"SCORE","charges":1,"triggerStages":["while_game_active","on_score_calculation"],"effectType":"score_modifier","targetType":"self","duration":"active_game","stackable":false,"consumable":true,"priority":70,"conflictKey":"focus","sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false},
-  {"id":"dumskroll-shtorm","number":4,"name":"Думскролл-шторм","description":"Съедает концентрацию: завершённая игра приносит на 1 очко меньше.","category":"DEBUFF","subcategory":"SCORE","charges":1,"triggerStages":["while_game_active","on_score_calculation"],"effectType":"score_modifier","targetType":"self,other","duration":"active_game","stackable":false,"consumable":true,"priority":75,"conflictKey":"focus","sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false},
-  {"id":"bananovaya-mina","number":5,"name":"Банановая мина","description":"Ловушка на следующий ход: игрок делает на 2 клетки меньше.","category":"TRAP","subcategory":"MOVE","charges":1,"triggerStages":["before_move"],"effectType":"move_modifier","targetType":"other","duration":"next_trigger","stackable":false,"consumable":true,"priority":90,"conflictKey":null,"sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false},
-  {"id":"toksichnyy-spoyler","number":6,"name":"Токсичный спойлер","description":"Следующее назначение можно взять только по Base-условиям.","category":"TRAP","subcategory":"CONDITION","charges":1,"triggerStages":["before_condition_select"],"effectType":"condition_lock","targetType":"other","duration":"next_assignment","stackable":false,"consumable":true,"priority":95,"conflictKey":null,"sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false},
-  {"id":"chistyy-reroll-vayba","number":7,"name":"Чистый реролл вайба","description":"Если сумма двух d6 получилась 5 или меньше, предмет добавляет ещё +2 клетки движения.","category":"NEUTRAL","subcategory":"MOVE","charges":1,"triggerStages":["after_roll"],"effectType":"conditional_move_modifier","targetType":"self","duration":"next_trigger","stackable":false,"consumable":true,"priority":60,"conflictKey":null,"sourceType":"DOCS","rawTextSource":"docs/rules-and-items.md","manualReview":false}
+  {
+    "id":"easy-eyes",
+    "number":1,
+    "name":"Лёгкие глаза",
+    "type":"BUFF",
+    "description":"Следующий ход ощущается комфортнее: итоговое перемещение игрока увеличивается на 1.",
+    "shortLabel":"+1 ход",
+    "imageUrl":"https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"self",
+    "conflictKey":"eyes",
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"easy-eyes-move","triggerStage":"after_roll","effectType":"move_modifier","value":1,"priority":80,"stackable":false,"oneTime":true,"consumption":"on_trigger","applicationText":"Лёгкие глаза добавляют +1 к итоговому перемещению."}
+    ]
+  },
+  {
+    "id":"blindfold-curse",
+    "number":2,
+    "name":"Проклятие слепой повязки",
+    "type":"DEBUFF",
+    "description":"Следующий ход становится тяжелее: итоговое перемещение игрока уменьшается на 1.",
+    "shortLabel":"-1 ход",
+    "imageUrl":"https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"self,other",
+    "conflictKey":"eyes",
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"blindfold-curse-move","triggerStage":"after_roll","effectType":"move_modifier","value":-1,"priority":85,"stackable":false,"oneTime":true,"consumption":"on_trigger","applicationText":"Проклятие слепой повязки отнимает 1 клетку от итогового перемещения."}
+    ]
+  },
+  {
+    "id":"chill-playlist",
+    "number":3,
+    "name":"Чилловый плейлист",
+    "type":"BUFF",
+    "description":"Помогает держать темп до конца активной игры: после победы игрок получает +1 очко сверху.",
+    "shortLabel":"+1 очко",
+    "imageUrl":"https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"self",
+    "conflictKey":"focus",
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"chill-playlist-active-tag","triggerStage":"while_game_active","effectType":"active_game_note","value":"Чилловый плейлист помогает не тильтовать и обещает +1 очко за победу.","priority":40,"stackable":false,"oneTime":false,"consumption":"on_run_resolved","applicationText":"Чилловый плейлист активен до завершения текущей игры."},
+      {"id":"chill-playlist-score","triggerStage":"on_score_calculation","effectType":"score_modifier","value":1,"priority":70,"stackable":false,"oneTime":true,"consumption":"on_run_resolved","applicationText":"Чилловый плейлист добавляет +1 очко к награде за активную игру."}
+    ]
+  },
+  {
+    "id":"doomscroll-storm",
+    "number":4,
+    "name":"Думскролл-шторм",
+    "type":"DEBUFF",
+    "description":"Съедает концентрацию: завершённая игра приносит на 1 очко меньше.",
+    "shortLabel":"-1 очко",
+    "imageUrl":"https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"self,other",
+    "conflictKey":"focus",
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"doomscroll-active-tag","triggerStage":"while_game_active","effectType":"active_game_note","value":"Думскролл-шторм мешает сконцентрироваться и готовит -1 очко при завершении.","priority":45,"stackable":false,"oneTime":false,"consumption":"on_run_resolved","applicationText":"Думскролл-шторм висит до конца активной игры."},
+      {"id":"doomscroll-score","triggerStage":"on_score_calculation","effectType":"score_modifier","value":-1,"priority":75,"stackable":false,"oneTime":true,"consumption":"on_run_resolved","applicationText":"Думскролл-шторм отнимает 1 очко от награды за игру."}
+    ]
+  },
+  {
+    "id":"banana-mine",
+    "number":5,
+    "name":"Банановая мина",
+    "type":"TRAP",
+    "description":"Ловушка на следующий ход: игрок делает на 2 клетки меньше.",
+    "shortLabel":"-2 ход",
+    "imageUrl":"https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"other",
+    "conflictKey":null,
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"banana-mine-move","triggerStage":"before_move","effectType":"move_modifier","value":-2,"priority":90,"stackable":false,"oneTime":true,"consumption":"on_trigger","applicationText":"Банановая мина заставляет потерять 2 клетки движения."}
+    ]
+  },
+  {
+    "id":"toxic-spoiler",
+    "number":6,
+    "name":"Токсичный спойлер",
+    "type":"TRAP",
+    "description":"Следующее назначение можно взять только по Base-условиям.",
+    "shortLabel":"Только Base",
+    "imageUrl":"https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"other",
+    "conflictKey":null,
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"toxic-spoiler-lock","triggerStage":"before_condition_select","effectType":"condition_lock","value":"BASE","priority":95,"stackable":false,"oneTime":true,"consumption":"on_assignment_created","applicationText":"Токсичный спойлер оставляет игроку только Base-условия для следующего назначения."}
+    ]
+  },
+  {
+    "id":"clean-reroll-vibe",
+    "number":7,
+    "name":"Чистый реролл вайба",
+    "type":"NEUTRAL",
+    "description":"Если сумма двух d6 получилась 5 или меньше, предмет добавляет ещё +2 клетки движения.",
+    "shortLabel":"+2 при 5-",
+    "imageUrl":"https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80",
+    "chargesDefault":1,
+    "allowedTargets":"self",
+    "conflictKey":null,
+    "active":true,
+    "manualReview":true,
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
+    "mechanics":[
+      {"id":"clean-reroll-vibe-move","triggerStage":"after_roll","effectType":"conditional_move_modifier","value":2,"priority":60,"stackable":false,"oneTime":true,"consumption":"on_trigger","conditions":{"maxRawRoll":5},"applicationText":"Чистый реролл вайба добавляет +2, потому что бросок был 5 или меньше."}
+    ]
+  }
 ]
