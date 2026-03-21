@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeStringList } from '@/lib/server/items';
 
 export const loginSchema = z.object({
   nickname: z.string().min(3).max(32),
@@ -32,8 +33,9 @@ export const itemDefinitionSchema = z.object({
   imageUrl: z.string().url().optional().or(z.literal('')),
   chargesDefault: z.coerce.number().int().min(1),
   allowedTargets: z.string().min(1),
+  conflictKey: z.string().optional().or(z.literal('')),
   active: z.enum(['true', 'false']).transform((value) => value === 'true'),
-});
+}).transform((value) => ({ ...value, conflictKey: value.conflictKey || null }));
 
 export const ruleSectionSchema = z.object({
   title: z.string().min(1),
@@ -42,3 +44,42 @@ export const ruleSectionSchema = z.object({
   order: z.coerce.number().int().min(0),
   published: z.enum(['true', 'false']).transform((value) => value === 'true'),
 });
+
+export const slotUpdateSchema = z.object({
+  slotId: z.string().min(1),
+  slotNumber: z.coerce.number().int().min(0).max(39),
+  name: z.string().min(1),
+  type: z.enum(['START', 'REGULAR', 'RANDOM', 'JAIL', 'LOTTERY', 'AUCTION', 'PODLYANKA', 'KAIFARIK', 'WHEEL']),
+  side: z.enum(['BOTTOM', 'LEFT', 'TOP', 'RIGHT']),
+  imageUrl: z.string().url().optional().or(z.literal('')),
+  imageFallback: z.string().min(1),
+  baseConditions: z.string().transform(normalizeStringList),
+  genreConditions: z.string().transform(normalizeStringList),
+  description: z.string().optional().or(z.literal('')),
+  isPlayable: z.enum(['true', 'false']).transform((value) => value === 'true'),
+  isPublished: z.enum(['true', 'false']).transform((value) => value === 'true'),
+}).transform((value) => ({ ...value, imageUrl: value.imageUrl || null, description: value.description || null }));
+
+export const wheelDefinitionSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional().or(z.literal('')),
+  imageUrl: z.string().url().optional().or(z.literal('')),
+  active: z.enum(['true', 'false']).transform((value) => value === 'true'),
+}).transform((value) => ({ ...value, description: value.description || null, imageUrl: value.imageUrl || null }));
+
+export const wheelEntrySchema = z.object({
+  label: z.string().min(1),
+  description: z.string().optional().or(z.literal('')),
+  imageUrl: z.string().url().optional().or(z.literal('')),
+  rewardType: z.enum(['ITEM', 'SPINS', 'NOTHING']),
+  itemDefinitionId: z.string().optional().or(z.literal('')),
+  rewardSpins: z.coerce.number().int().min(0).optional(),
+  weight: z.coerce.number().int().min(1),
+  active: z.enum(['true', 'false']).transform((value) => value === 'true'),
+}).transform((value) => ({
+  ...value,
+  description: value.description || null,
+  imageUrl: value.imageUrl || null,
+  itemDefinitionId: value.itemDefinitionId || null,
+  rewardSpins: value.rewardType === 'SPINS' ? value.rewardSpins ?? 1 : null,
+}));

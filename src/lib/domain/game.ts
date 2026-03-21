@@ -51,3 +51,13 @@ export function transitionAssignment(current: TransitionStatus, next: Transition
   if (next === 'DISPUTED' || next === 'RESOLVED') return actorRole !== 'PLAYER';
   return true;
 }
+
+export function pickWeightedValue<T extends { weight: number }>(entries: T[], randomValue = Math.random()) {
+  const total = entries.reduce((sum, entry) => sum + Math.max(entry.weight, 0), 0);
+  let cursor = randomValue * total;
+  for (const entry of entries) {
+    cursor -= Math.max(entry.weight, 0);
+    if (cursor <= 0) return entry;
+  }
+  return entries[entries.length - 1];
+}

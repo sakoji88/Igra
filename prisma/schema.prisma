@@ -58,6 +58,7 @@ enum EventType {
   TURN
   RUN
   ITEM
+  WHEEL
   ADMIN
   RULE
 }
@@ -80,7 +81,6 @@ model User {
   seasonStates PlayerSeasonState[]
   runs         RunAssignment[]
   upcoming     UpcomingEvent[]
-  inventory    PlayerInventoryItem[]
   logs         EventLog[]
 }
 
@@ -105,6 +105,9 @@ model Season {
   boardSlots BoardSlot[]
   runs      RunAssignment[]
   logs      EventLog[]
+  wheelDefinitions WheelDefinition[]
+  wheelSpins WheelSpin[]
+  spinGrants WheelSpinGrant[]
 }
 
 model PlayerSeasonState {
@@ -113,6 +116,7 @@ model PlayerSeasonState {
   seasonId       String
   score          Int      @default(0)
   boardPosition  Int      @default(0)
+  availableWheelSpins Int @default(0)
   lastDie1       Int?
   lastDie2       Int?
   lastRollTotal  Int?
@@ -120,6 +124,10 @@ model PlayerSeasonState {
   updatedAt      DateTime @updatedAt
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   season         Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  inventoryItems PlayerInventoryItem[]
+  wheelSpins     WheelSpin[]
+  receivedSpinGrants WheelSpinGrant[] @relation("GrantReceiverState")
+  givenSpinGrants WheelSpinGrant[] @relation("GrantGiverState")
 
   @@unique([userId, seasonId])
 }
@@ -137,6 +145,7 @@ model BoardSlot {
   genreConditions String[]
   description     String?
   isPlayable      Boolean  @default(true)
+  isPublished     Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   season          Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
@@ -162,9 +171,11 @@ model RunAssignment {
   playerComment  String?
   completedAt    DateTime?
   droppedAt      DateTime?
+  wheelSpinsGrantedAt DateTime?
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   season         Season        @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   slot           BoardSlot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  grantedWheelSpins WheelSpinGrant[]
 }
 
 model UpcomingEvent {
@@ -188,21 +199,86 @@ model ItemDefinition {
   imageUrl       String?
   chargesDefault Int      @default(1)
   allowedTargets String   @default("self")
+  conflictKey    String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   inventoryItems PlayerInventoryItem[]
+  wheelEntries   WheelEntry[]
 }
 
 model PlayerInventoryItem {
   id               String         @id @default(cuid())
-  userId           String
+  playerSeasonStateId String
   itemDefinitionId String
-  charges          Int            @default(1)
-  createdAt        DateTime       @default(now())
+  chargesCurrent   Int            @default(1)
+  sourceType       String         @default("ADMIN")
+  sourceReferenceId String?
+  obtainedAt       DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playerSeasonState PlayerSeasonState @relation(fields: [playerSeasonStateId], references: [id], onDelete: Cascade)
   itemDefinition   ItemDefinition @relation(fields: [itemDefinitionId], references: [id], onDelete: Cascade)
+}
+
+model WheelDefinition {
+  id          String      @id @default(cuid())
+  seasonId    String
+  name        String
+  description String?
+  imageUrl    String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  season      Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  entries     WheelEntry[]
+  spins       WheelSpin[]
+}
+
+model WheelEntry {
+  id               String          @id @default(cuid())
+  wheelDefinitionId String
+  label            String
+  description      String?
+  imageUrl         String?
+  rewardType       String          @default("ITEM")
+  itemDefinitionId String?
+  rewardSpins      Int?
+  weight           Int             @default(1)
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  wheelDefinition  WheelDefinition @relation(fields: [wheelDefinitionId], references: [id], onDelete: Cascade)
+  itemDefinition   ItemDefinition? @relation(fields: [itemDefinitionId], references: [id], onDelete: SetNull)
+  spins            WheelSpin[]
+}
+
+model WheelSpin {
+  id                String           @id @default(cuid())
+  seasonId          String
+  playerSeasonStateId String
+  wheelDefinitionId String
+  wheelEntryId      String
+  createdAt         DateTime         @default(now())
+  season            Season           @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  playerSeasonState PlayerSeasonState @relation(fields: [playerSeasonStateId], references: [id], onDelete: Cascade)
+  wheelDefinition   WheelDefinition  @relation(fields: [wheelDefinitionId], references: [id], onDelete: Cascade)
+  wheelEntry        WheelEntry       @relation(fields: [wheelEntryId], references: [id], onDelete: Cascade)
+}
+
+model WheelSpinGrant {
+  id                  String            @id @default(cuid())
+  seasonId            String
+  giverStateId        String
+  receiverStateId     String
+  runAssignmentId     String
+  spinsGranted        Int               @default(3)
+  createdAt           DateTime          @default(now())
+  season              Season            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  giverState          PlayerSeasonState @relation("GrantGiverState", fields: [giverStateId], references: [id], onDelete: Cascade)
+  receiverState       PlayerSeasonState @relation("GrantReceiverState", fields: [receiverStateId], references: [id], onDelete: Cascade)
+  runAssignment       RunAssignment     @relation(fields: [runAssignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([runAssignmentId])
 }
 
 model RuleSection {

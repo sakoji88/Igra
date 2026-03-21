@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEffects, calculateScore, moveOnBoard, roll2d6, transitionAssignment } from '../src/lib/domain/game.ts';
+import { applyEffects, calculateScore, moveOnBoard, pickWeightedValue, roll2d6, transitionAssignment } from '../src/lib/domain/game.ts';
 
 test('roll and move around board', () => {
   const roll = roll2d6([4, 3]);
@@ -36,4 +36,13 @@ test('score update logic supports genre and lap bonus', () => {
   assert.equal(calculateScore(4, 'BASE', false), 4);
   assert.equal(calculateScore(4, 'GENRE', false), 8);
   assert.equal(calculateScore(4, 'GENRE', true), 11);
+});
+
+test('weighted wheel selection is server-deterministic for a provided random value', () => {
+  const entry = pickWeightedValue([
+    { id: 'a', weight: 1 },
+    { id: 'b', weight: 3 },
+    { id: 'c', weight: 1 },
+  ], 0.4);
+  assert.equal(entry.id, 'b');
 });

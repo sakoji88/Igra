@@ -71,6 +71,7 @@ export function createBoardSlotSeed(seasonId: string) {
       genreConditions,
       description: `Слот ${index} на ${side.toLowerCase()} стороне поля.`,
       isPlayable: type === 'REGULAR' || type === 'RANDOM',
+      isPublished: true,
     };
   });
 }

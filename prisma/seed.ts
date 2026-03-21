@@ -1,9 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../src/lib/prisma.ts';
 import { createBoardSlotSeed } from '../src/lib/server/board.ts';
-import { currentSeason, defaultItemDefinitions, defaultRules, seedAdmin } from './seed-data.ts';
+import { currentSeason, defaultItemDefinitions, defaultRules, defaultWheel, defaultWheelEntries, seedAdmin } from './seed-data.ts';
 
 async function main() {
+  await prisma.wheelSpin.deleteMany();
+  await prisma.wheelSpinGrant.deleteMany();
+  await prisma.wheelEntry.deleteMany();
+  await prisma.wheelDefinition.deleteMany();
   await prisma.playerInventoryItem.deleteMany();
   await prisma.upcomingEvent.deleteMany();
   await prisma.runAssignment.deleteMany();
@@ -40,26 +44,64 @@ async function main() {
       profile: {
         create: { displayName: seedAdmin.displayName, bio: 'Главный управляющий локального хаоса.' },
       },
-      seasonStates: {
-        create: { seasonId: season.id, boardPosition: 0, score: 0 },
-      },
     },
+  });
+
+  const adminState = await prisma.playerSeasonState.create({
+    data: { seasonId: season.id, userId: admin.id, boardPosition: 0, score: 0, availableWheelSpins: 3 },
   });
 
   await prisma.boardSlot.createMany({ data: createBoardSlotSeed(season.id) });
   await prisma.itemDefinition.createMany({ data: defaultItemDefinitions });
   await prisma.ruleSection.createMany({ data: defaultRules });
+
+  const itemDefinitions = await prisma.itemDefinition.findMany();
+  const itemByNumber = new Map(itemDefinitions.map((item) => [item.number, item.id]));
+
+  const wheel = await prisma.wheelDefinition.create({
+    data: {
+      seasonId: season.id,
+      name: defaultWheel.name,
+      description: defaultWheel.description,
+      imageUrl: defaultWheel.imageUrl,
+      active: defaultWheel.active,
+    },
+  });
+
+  await prisma.wheelEntry.createMany({
+    data: defaultWheelEntries.map((entry) => ({
+      wheelDefinitionId: wheel.id,
+      label: entry.label,
+      description: entry.description,
+      rewardType: entry.rewardType,
+      itemDefinitionId: entry.rewardType === 'ITEM' ? itemByNumber.get(entry.itemNumber!) ?? null : null,
+      rewardSpins: 'rewardSpins' in entry ? entry.rewardSpins ?? null : null,
+      weight: entry.weight,
+      imageUrl: entry.imageUrl,
+      active: entry.active,
+    })),
+  });
+
+  await prisma.playerInventoryItem.create({
+    data: {
+      playerSeasonStateId: adminState.id,
+      itemDefinitionId: itemByNumber.get(7)!,
+      chargesCurrent: 1,
+      sourceType: 'SEED',
+    },
+  });
+
   await prisma.eventLog.create({
     data: {
       seasonId: season.id,
       userId: admin.id,
       type: 'SYSTEM',
-      summary: 'База сезона и админ-аккаунт подготовлены.',
-      payload: { admin: seedAdmin.nickname },
+      summary: 'База сезона, колесо и админ-аккаунт подготовлены.',
+      payload: { admin: seedAdmin.nickname, wheel: defaultWheel.name },
     },
   });
 
-  console.log(`Seeded season ${season.name} and admin ${seedAdmin.nickname}/${seedAdmin.password}`);
+  console.log(`Seeded season ${season.name}, admin ${seedAdmin.nickname}/${seedAdmin.password} and wheel ${wheel.name}`);
 }
 
 main()

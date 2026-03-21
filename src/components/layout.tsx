@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/lib/auth/config';
 
-const links: Array<[string, '/' | '/board' | '/players' | '/rules' | '/admin']> = [
+const links: Array<[string, '/' | '/board' | '/players' | '/items' | '/wheel' | '/rules' | '/admin']> = [
   ['Дашборд', '/'],
   ['Поле', '/board'],
   ['Игроки', '/players'],
+  ['Предметы', '/items'],
+  ['Колесо', '/wheel'],
   ['Правила', '/rules'],
   ['Админка', '/admin'],
 ];

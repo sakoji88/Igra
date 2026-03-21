@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { getDashboardData } from '@/lib/server/data';
 
 export default async function HomePage() {
-  const { season, states, logs } = await getDashboardData();
+  const { season, states, logs, wheel } = await getDashboardData();
 
   return (
     <AppLayout>
@@ -14,13 +14,16 @@ export default async function HomePage() {
           <Card>
             <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">Текущий сезон</p>
             <h2 className="mt-2 text-3xl font-black">{season.name}</h2>
-            <p className="mt-3 max-w-2xl text-zinc-400">Теперь это уже не mock-дашборд: игроки регистрируются сами, появляются на старте, кидают кубы с сервера и получают живые раны в профиль.</p>
+            <p className="mt-3 max-w-2xl text-zinc-400">Теперь это уже не mock-дашборд: игроки регистрируются сами, появляются на старте, кидают кубы с сервера, дарят друг другу wheel-спины и получают живые предметы через серверное колесо.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/board" className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100">На поле</Link>
               <Link href="/players" className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-200">Игроки</Link>
+              <Link href="/items" className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-200">Предметы</Link>
+              <Link href="/wheel" className="rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-2 text-sm text-fuchsia-100">Колесо</Link>
               <Link href="/rules" className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-200">Правила</Link>
             </div>
           </Card>
+          {wheel ? <Card><h3 className="text-xl font-bold">Колесо сезона</h3><p className="mt-3 text-zinc-400">{wheel.name} • активных секторов: {wheel.entries.length}</p></Card> : null}
           <Card>
             <h3 className="text-xl font-bold">Лидерборд сезона</h3>
             <div className="mt-4 grid gap-3">
