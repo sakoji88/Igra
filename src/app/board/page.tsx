@@ -3,6 +3,8 @@ import { AppLayout } from '@/components/layout';
 import { PerimeterBoard } from '@/components/board';
 import { requireSession } from '@/lib/server/auth';
 import { getBoardViewData, getCurrentUserState } from '@/lib/server/data';
+import { getActiveEffectsPreview, resolveActiveGameEffects } from '@/lib/domain/effect-engine';
+import { mapInventoryItemsForEffects } from '@/lib/server/items';
 
 export default async function BoardPage() {
   const session = await requireSession();
@@ -35,12 +37,24 @@ export default async function BoardPage() {
     isActivePlayer: state.user.id === session.user.id,
   }));
 
-  const activeRun = current.user.runs.find((run) => run.status === 'ACTIVE');
+  const activeRun = current.user.runs.find((run) => run.status === 'ACTIVE') ?? null;
+  const runtimeItems = mapInventoryItemsForEffects(current.inventoryItems.map((item) => ({
+    id: item.id,
+    chargesCurrent: item.chargesCurrent,
+    itemDefinition: {
+      id: item.itemDefinition.id,
+      number: item.itemDefinition.number,
+      name: item.itemDefinition.name,
+      type: item.itemDefinition.type,
+    },
+  })));
+  const activeEffectsPreview = getActiveEffectsPreview(runtimeItems);
+  const activeGameEffects = resolveActiveGameEffects(runtimeItems);
 
   return (
     <AppLayout>
       <div className="grid gap-6 xl:grid-cols-[2.15fr_0.85fr]">
-        <CardShell title="Игровое поле" subtitle="Кликай по слоту, смотри условия, кидай кубы прямо на поле. Админ редактирует контент слота прямо из модалки.">
+        <CardShell title="Игровое поле" subtitle="Полный цикл игрока: бросок, автоэффекты, движение, выбор условий и фиксация активной игры прямо на поле.">
           <PerimeterBoard
             board={board}
             players={players}
@@ -48,20 +62,24 @@ export default async function BoardPage() {
             seasonName={season.name}
             currentPosition={current.boardPosition}
             hasActiveRun={Boolean(activeRun)}
+            activeRun={activeRun ? { id: activeRun.id, slotName: activeRun.slotName, gameTitle: activeRun.gameTitle, conditionType: activeRun.conditionType } : null}
+            activeEffectsPreview={activeEffectsPreview.map((effect) => ({ itemName: effect.itemName, stage: effect.stage, text: effect.text }))}
+            activeGameEffects={activeGameEffects}
+            blockedReason={activeRun ? `Активная игра «${activeRun.gameTitle ?? activeRun.slotName}» блокирует новый бросок.` : null}
             isAdmin={session.user.role === 'ADMIN'}
-            initialRoll={{ die1: current.lastDie1, die2: current.lastDie2, total: current.lastRollTotal }}
+            initialRoll={{ die1: current.lastDie1, die2: current.lastDie2, total: current.lastRollTotal, finalMoveTotal: current.lastRollTotal }}
           />
         </CardShell>
         <div className="grid gap-6">
-          <CardShell title="Текущий статус" subtitle="Сервер хранит бросок, позицию, активный ран и wheel-спины.">
+          <CardShell title="Текущий статус" subtitle="Сервер хранит позицию, счёт, активную игру, автоэффекты и спины колеса.">
             <div className="grid gap-3 text-sm text-zinc-300">
               <div className="rounded-2xl bg-zinc-900/70 p-4">Позиция: {current.boardPosition}</div>
               <div className="rounded-2xl bg-zinc-900/70 p-4">Счёт: {current.score}</div>
-              <div className="rounded-2xl bg-zinc-900/70 p-4">Активный ран: {activeRun ? `${activeRun.slotName} (${activeRun.conditionType})` : 'Нет'}</div>
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Активная игра: {activeRun ? `${activeRun.gameTitle ?? 'Не записана'} • ${activeRun.slotName}` : 'Нет'}</div>
               <div className="rounded-2xl bg-zinc-900/70 p-4">Спины колеса: {current.availableWheelSpins}</div>
             </div>
           </CardShell>
-          <CardShell title="Последние события" subtitle="Локальный event log сезона.">
+          <CardShell title="Последние события" subtitle="Локальный журнал сезона.">
             <div className="grid gap-3 text-sm">
               {logs.slice(0, 8).map((event) => <div key={event.id} className="rounded-2xl bg-zinc-900/70 p-3"><p>{event.summary}</p></div>)}
             </div>

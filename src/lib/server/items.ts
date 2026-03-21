@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import type { InventoryRuntimeItem } from '@/lib/domain/effect-engine';
+import { contentItemDefinitions } from '@/lib/content/game-content';
 
 type ItemType = 'BUFF' | 'DEBUFF' | 'TRAP' | 'NEUTRAL';
 type ItemDefinitionLike = {
@@ -79,6 +81,25 @@ export async function grantItemToState(params: {
   };
 }
 
+export async function consumeInventoryItems(inventoryItemIds: string[]) {
+  if (inventoryItemIds.length === 0) return;
+  await prisma.playerInventoryItem.deleteMany({ where: { id: { in: inventoryItemIds } } });
+}
+
+export function mapInventoryItemsForEffects(
+  inventoryItems: Array<{
+    id: string;
+    chargesCurrent: number;
+    itemDefinition: { id: string; number: number; name: string; type: ItemType };
+  }>,
+): InventoryRuntimeItem[] {
+  return inventoryItems.map((item) => ({
+    inventoryItemId: item.id,
+    chargesCurrent: item.chargesCurrent,
+    itemDefinition: item.itemDefinition,
+  }));
+}
+
 export function getItemTypeBadgeClasses(type: ItemType) {
   if (type === 'BUFF') return 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100';
   if (type === 'DEBUFF') return 'border-red-400/40 bg-red-500/10 text-red-100';
@@ -98,6 +119,23 @@ export function getTargetLabel(value: string) {
   if (value === 'other') return 'Другому игроку';
   if (value === 'self,other') return 'Себе или другому';
   return value;
+}
+
+export function getItemStageLabel(stage: string) {
+  if (stage === 'before_roll') return 'Перед броском';
+  if (stage === 'after_roll') return 'После броска';
+  if (stage === 'before_move') return 'Перед движением';
+  if (stage === 'after_move') return 'После движения';
+  if (stage === 'before_condition_select') return 'Перед выбором условий';
+  if (stage === 'after_condition_select') return 'После выбора условий';
+  if (stage === 'on_game_assigned') return 'При назначении игры';
+  if (stage === 'while_game_active') return 'Пока игра активна';
+  if (stage === 'on_score_calculation') return 'При подсчёте очков';
+  return stage;
+}
+
+export function getContentItemMetadata(number: number) {
+  return contentItemDefinitions.find((item) => item.number === number) ?? null;
 }
 
 export function normalizeStringList(value: string) {

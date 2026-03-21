@@ -1,3 +1,5 @@
+import { contentItemDefinitions, coreRuleSections, wheelEntriesContent } from '../src/lib/content/game-content.ts';
+
 export const currentSeason = { slug: 'spring-2026', name: 'Весенний мемомес 2026' };
 
 export const seedAdmin = {
@@ -8,116 +10,25 @@ export const seedAdmin = {
   displayName: 'Главмем',
 };
 
-export const defaultRules = [
-  {
-    title: 'Базовые правила',
-    slug: 'core-rules',
-    order: 1,
-    published: true,
-    content: 'Все игроки стартуют на клетке Старт. Ход определяется суммой двух d6. После движения игрок сначала разрешает клетку, а затем выбирает base или genre условия.',
-  },
-  {
-    title: 'Колесо и предметы',
-    slug: 'wheel-and-items',
-    order: 2,
-    published: true,
-    content: 'После завершённого рана игрок может подарить другому игроку ровно 3 спина колеса. Колесо крутится красиво на клиенте, но результат всегда определяет сервер. Награды попадают в инвентарь или взаимно аннигилируются по conflictKey.',
-  },
-  {
-    title: 'Конфликты эффектов',
-    slug: 'effect-conflicts',
-    order: 3,
-    published: true,
-    content: 'Если новый BUFF и уже существующий DEBUFF имеют одинаковый conflictKey, они уничтожают друг друга. То же самое работает в обратную сторону. Ловушки хранятся как предметы и готовятся к будущему targetable-использованию.',
-  },
-  {
-    title: 'Админ-контент',
-    slug: 'admin-content',
-    order: 4,
-    published: true,
-    content: 'Админ управляет предметами, слотами, правилами и wheel-entries без правки кода. Все заметные изменения пишутся в event log.',
-  },
-];
+export const defaultRules = coreRuleSections.map((section) => ({
+  title: section.title,
+  slug: section.slug,
+  order: section.order,
+  published: section.published,
+  content: section.content,
+}));
 
-export const defaultItemDefinitions = [
-  {
-    number: 1,
-    name: 'Лёгкие глаза',
-    type: 'BUFF' as const,
-    description: 'Экран внезапно перестаёт выжигать сетчатку. Даёт спокойный вайб для следующего рана.',
-    imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'self',
-    conflictKey: 'eyes',
-    active: true,
-  },
-  {
-    number: 2,
-    name: 'Проклятие слепой повязки',
-    type: 'DEBUFF' as const,
-    description: 'Мемный дебафф на зрение. Отлично конфликтует с комфортным эффектом для глаз.',
-    imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'self,other',
-    conflictKey: 'eyes',
-    active: true,
-  },
-  {
-    number: 3,
-    name: 'Чилловый плейлист',
-    type: 'BUFF' as const,
-    description: 'Добавляет концентрации и не даёт тильтовать на дурацком рандоме.',
-    imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'self',
-    conflictKey: 'focus',
-    active: true,
-  },
-  {
-    number: 4,
-    name: 'Думскролл-шторм',
-    type: 'DEBUFF' as const,
-    description: 'Классический разнос концентрации и настроя.',
-    imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'self,other',
-    conflictKey: 'focus',
-    active: true,
-  },
-  {
-    number: 5,
-    name: 'Банановая мина',
-    type: 'TRAP' as const,
-    description: 'Сохраняется в инвентаре как targetable-ловушка для будущего применения к другому игроку.',
-    imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'other',
-    conflictKey: null,
-    active: true,
-  },
-  {
-    number: 6,
-    name: 'Токсичный спойлер',
-    type: 'TRAP' as const,
-    description: 'Не убивает, но портит атмосферу и требует target metadata.',
-    imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'other',
-    conflictKey: null,
-    active: true,
-  },
-  {
-    number: 7,
-    name: 'Чистый реролл вайба',
-    type: 'NEUTRAL' as const,
-    description: 'Нейтральный дроп для структуры колеса. Просто красиво лежит в логе как редкий safe-outcome.',
-    imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80',
-    chargesDefault: 1,
-    allowedTargets: 'self',
-    conflictKey: null,
-    active: true,
-  },
-];
+export const defaultItemDefinitions = contentItemDefinitions.map((item) => ({
+  number: item.number,
+  name: item.name,
+  type: item.type,
+  description: item.description,
+  imageUrl: item.imageUrl,
+  chargesDefault: item.chargesDefault,
+  allowedTargets: item.allowedTargets,
+  conflictKey: item.conflictKey,
+  active: item.active,
+}));
 
 export const defaultWheel = {
   name: 'Колесо мемных артефактов',
@@ -126,79 +37,7 @@ export const defaultWheel = {
   active: true,
 };
 
-export const defaultWheelEntries = [
-  {
-    label: 'Лёгкие глаза',
-    description: 'BUFF-предмет для глаз.',
-    rewardType: 'ITEM',
-    itemNumber: 1,
-    weight: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: 'Проклятие слепой повязки',
-    description: 'DEBUFF-предмет, конфликтует с комфортом для глаз.',
-    rewardType: 'ITEM',
-    itemNumber: 2,
-    weight: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: 'Чилловый плейлист',
-    description: 'BUFF на концентрацию.',
-    rewardType: 'ITEM',
-    itemNumber: 3,
-    weight: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: 'Думскролл-шторм',
-    description: 'DEBUFF на фокус.',
-    rewardType: 'ITEM',
-    itemNumber: 4,
-    weight: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: 'Банановая мина',
-    description: 'TRAP-дроп.',
-    rewardType: 'ITEM',
-    itemNumber: 5,
-    weight: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: 'Токсичный спойлер',
-    description: 'TRAP-дроп для будущего таргетинга.',
-    rewardType: 'ITEM',
-    itemNumber: 6,
-    weight: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: '+1 дополнительный спин',
-    description: 'Нейтральный сектор, который просто докидывает один спин.',
-    rewardType: 'SPINS',
-    rewardSpins: 1,
-    weight: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-  {
-    label: 'Ничего, кроме вайба',
-    description: 'Пустой, но атмосферный safe сектор.',
-    rewardType: 'NOTHING',
-    weight: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=400&q=80',
-    active: true,
-  },
-] as const;
+export const defaultWheelEntries = wheelEntriesContent;
 
 export const boardCells = [
   ['Старт x Финиш', 'START'],

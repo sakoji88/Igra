@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 type BoardSlotSide = 'bottom' | 'left' | 'top' | 'right';
 type BoardSlotType = 'START' | 'REGULAR' | 'RANDOM' | 'JAIL' | 'LOTTERY' | 'AUCTION' | 'PODLYANKA' | 'KAIFARIK' | 'WHEEL';
+type ConditionType = 'BASE' | 'GENRE';
 
 type BoardCellData = {
   id: string;
@@ -32,6 +33,27 @@ type BoardPlayerData = {
   isActivePlayer: boolean;
 };
 
+type EffectBreakdownEntry = {
+  stage: string;
+  itemName: string;
+  text: string;
+  delta?: number;
+  lockTo?: 'BASE' | 'GENRE';
+};
+
+type EffectPreview = {
+  itemName: string;
+  stage: string;
+  text: string;
+};
+
+type ActiveRunSummary = {
+  id: string;
+  slotName: string;
+  gameTitle: string | null;
+  conditionType: ConditionType;
+};
+
 type BoardProps = {
   board: BoardCellData[];
   players: BoardPlayerData[];
@@ -39,8 +61,12 @@ type BoardProps = {
   seasonName: string;
   currentPosition: number;
   hasActiveRun: boolean;
+  activeRun: ActiveRunSummary | null;
+  activeGameEffects: Array<{ itemName: string; text: string }>;
+  activeEffectsPreview: EffectPreview[];
+  blockedReason: string | null;
   isAdmin: boolean;
-  initialRoll?: { die1: number | null; die2: number | null; total: number | null };
+  initialRoll?: { die1: number | null; die2: number | null; total: number | null; finalMoveTotal?: number | null; breakdown?: EffectBreakdownEntry[] };
 };
 
 type CellMeta = {
@@ -118,6 +144,15 @@ function getMarkerTailClasses(side: BoardSlotSide) {
   return 'h-px w-4';
 }
 
+function getStageLabel(stage: string) {
+  if (stage === 'before_roll') return 'Перед броском';
+  if (stage === 'after_roll') return 'После броска';
+  if (stage === 'before_move') return 'Перед движением';
+  if (stage === 'after_move') return 'После движения';
+  if (stage === 'before_condition_select') return 'Перед выбором условий';
+  return stage;
+}
+
 function PlayerToken({ player }: { player: BoardPlayerData }) {
   return (
     <div className="group relative flex flex-col items-center">
@@ -184,10 +219,66 @@ function BoardTile({ cell, meta, playersOnCell, onSelect }: { cell: BoardCellDat
   );
 }
 
+function ActiveGameModal({
+  runId,
+  slotName,
+  conditionType,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  runId: string;
+  slotName: string;
+  conditionType: ConditionType;
+  onClose: () => void;
+  onConfirm: (payload: { runId: string; gameTitle: string; gameUrl: string; playerComment: string }) => void;
+  isPending: boolean;
+}) {
+  const [gameTitle, setGameTitle] = useState('');
+  const [gameUrl, setGameUrl] = useState('https://gamegauntlets.com/#settings');
+  const [playerComment, setPlayerComment] = useState('');
+  const [error, setError] = useState('');
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
+      <div className="pointer-events-auto w-full max-w-[640px] rounded-[2rem] border border-fuchsia-400/30 bg-zinc-950/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+        <p className="text-xs uppercase tracking-[0.32em] text-fuchsia-300">Следующий шаг после условий</p>
+        <h4 className="mt-3 text-3xl font-black text-white">Зафиксируй активную игру</h4>
+        <p className="mt-3 text-sm text-zinc-300">Слот: {slotName}. Выбраны условия: {conditionType === 'BASE' ? 'Base' : 'Genre'}. Сначала открой настройки генератора, затем впиши игру, которую берёшь в актив.</p>
+        <a href="https://gamegauntlets.com/#settings" target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100">Открыть настройки GameGauntlets</a>
+        <div className="mt-5 grid gap-3">
+          <input value={gameTitle} onChange={(event) => { setGameTitle(event.target.value); setError(''); }} placeholder="Название назначенной игры" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+          <input value={gameUrl} onChange={(event) => setGameUrl(event.target.value)} placeholder="Ссылка на игру или на подборку" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+          <textarea value={playerComment} onChange={(event) => setPlayerComment(event.target.value)} placeholder="Короткая пометка игрока: что выбрал, какие настройки важны" className="min-h-28 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+          {error ? <p className="text-sm text-red-300">{error}</p> : null}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => {
+              if (!gameTitle.trim()) {
+                setError('Нужно указать игру, иначе активный слот останется без понятной записи.');
+                return;
+              }
+              onConfirm({ runId, gameTitle: gameTitle.trim(), gameUrl: gameUrl.trim(), playerComment: playerComment.trim() });
+            }}
+            className="rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-5 py-3 text-sm font-semibold text-fuchsia-100 disabled:opacity-40"
+          >
+            {isPending ? 'Сохраняем игру...' : 'Сохранить активную игру'}
+          </button>
+          <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-700 px-5 py-3 text-sm text-zinc-200">Позже из профиля</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SlotDetailWindow({
   cell,
   onClose,
   canAssign,
+  forcedCondition,
   onAssign,
   isPending,
   isAdmin,
@@ -196,26 +287,14 @@ function SlotDetailWindow({
   cell: BoardCellData;
   onClose: () => void;
   canAssign: boolean;
-  onAssign: (conditionType: 'BASE' | 'GENRE') => void;
+  forcedCondition: ConditionType | null;
+  onAssign: (conditionType: ConditionType) => void;
   isPending: boolean;
   isAdmin: boolean;
   onSave: (payload: Record<string, string>) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  type SlotEditState = {
-    slotNumber: string;
-    name: string;
-    type: string;
-    side: string;
-    imageUrl: string;
-    imageFallback: string;
-    baseConditions: string;
-    genreConditions: string;
-    description: string;
-    isPlayable: string;
-    isPublished: string;
-  };
-  const [formState, setFormState] = useState<SlotEditState>({
+  const [formState, setFormState] = useState({
     slotNumber: String(cell.slotNumber),
     name: cell.name,
     type: cell.type,
@@ -248,7 +327,7 @@ function SlotDetailWindow({
           <div className="flex gap-2">
             {isAdmin ? (
               <button type="button" onClick={() => setIsEditing((current) => !current)} className="rounded-full border border-fuchsia-400/40 px-3 py-1 text-xs text-fuchsia-100">
-                {isEditing ? 'Cancel' : 'Edit Slot'}
+                {isEditing ? 'Отменить правку' : 'Редактировать слот'}
               </button>
             ) : null}
             <button type="button" onClick={onClose} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:border-cyan-300 hover:text-white">Закрыть</button>
@@ -268,26 +347,27 @@ function SlotDetailWindow({
               </div>
             </div>
             {cell.description ? <p className="mt-4 text-xs text-zinc-400">{cell.description}</p> : null}
+            {forcedCondition ? <p className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">Активный эффект ограничил следующий выбор условий: только {forcedCondition === 'BASE' ? 'Base' : 'Genre'}.</p> : null}
             <div className="mt-4 flex flex-wrap gap-3">
-              <button type="button" disabled={!canAssign || isPending} onClick={() => onAssign('BASE')} className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">Выбрать Base</button>
-              <button type="button" disabled={!canAssign || isPending} onClick={() => onAssign('GENRE')} className="rounded-full border border-pink-400/40 bg-pink-500/10 px-4 py-2 text-sm text-pink-100 disabled:cursor-not-allowed disabled:opacity-40">Выбрать Genre</button>
-              {!canAssign ? <p className="text-xs text-zinc-500">Ран можно создать только на текущей игровой клетке и только если у игрока нет активного рана.</p> : null}
+              <button type="button" disabled={!canAssign || isPending || forcedCondition === 'GENRE'} onClick={() => onAssign('BASE')} className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">Выбрать Base</button>
+              <button type="button" disabled={!canAssign || isPending || forcedCondition === 'BASE'} onClick={() => onAssign('GENRE')} className="rounded-full border border-pink-400/40 bg-pink-500/10 px-4 py-2 text-sm text-pink-100 disabled:cursor-not-allowed disabled:opacity-40">Выбрать Genre</button>
+              {!canAssign ? <p className="text-xs text-zinc-500">Игру можно назначить только на текущей игровой клетке и только если у игрока нет активной игры.</p> : null}
             </div>
           </>
         ) : (
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             <input value={formState.slotNumber} onChange={(event) => setFormState((current) => ({ ...current, slotNumber: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
             <input value={formState.name} onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
-            <select value={formState.type} onChange={(event) => setFormState((current) => ({ ...current, type: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">{slotTypeOptions.map((option) => <option key={option}>{option}</option>)}</select>
-            <select value={formState.side} onChange={(event) => setFormState((current) => ({ ...current, side: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">{slotSideOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-            <input value={formState.imageUrl} onChange={(event) => setFormState((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="Image URL" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 md:col-span-2" />
-            <input value={formState.imageFallback} onChange={(event) => setFormState((current) => ({ ...current, imageFallback: event.target.value }))} placeholder="Fallback emoji" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 md:col-span-2" />
+            <select value={formState.type} onChange={(event) => setFormState((current) => ({ ...current, type: event.target.value as BoardSlotType }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">{slotTypeOptions.map((option) => <option key={option}>{option}</option>)}</select>
+            <select value={formState.side} onChange={(event) => setFormState((current) => ({ ...current, side: event.target.value as 'BOTTOM' | 'LEFT' | 'TOP' | 'RIGHT' }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">{slotSideOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            <input value={formState.imageUrl} onChange={(event) => setFormState((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="Ссылка на изображение" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 md:col-span-2" />
+            <input value={formState.imageFallback} onChange={(event) => setFormState((current) => ({ ...current, imageFallback: event.target.value }))} placeholder="Запасной эмодзи" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 md:col-span-2" />
             <textarea value={formState.baseConditions} onChange={(event) => setFormState((current) => ({ ...current, baseConditions: event.target.value }))} className="min-h-28 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
             <textarea value={formState.genreConditions} onChange={(event) => setFormState((current) => ({ ...current, genreConditions: event.target.value }))} className="min-h-28 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
             <textarea value={formState.description} onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))} className="min-h-24 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 md:col-span-2" />
-            <select value={formState.isPlayable} onChange={(event) => setFormState((current) => ({ ...current, isPlayable: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3"><option value="true">Игровой слот</option><option value="false">Не игровой</option></select>
+            <select value={formState.isPlayable} onChange={(event) => setFormState((current) => ({ ...current, isPlayable: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3"><option value="true">Игровой слот</option><option value="false">Неигровой слот</option></select>
             <select value={formState.isPublished} onChange={(event) => setFormState((current) => ({ ...current, isPublished: event.target.value }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3"><option value="true">Опубликован</option><option value="false">Скрыт</option></select>
-            <button type="button" disabled={isPending} onClick={() => onSave({ slotId: cell.id, ...formState })} className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-100 md:col-span-2">{isPending ? 'Сохраняем...' : 'Save Changes'}</button>
+            <button type="button" disabled={isPending} onClick={() => onSave({ slotId: cell.id, ...formState })} className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-100 md:col-span-2">{isPending ? 'Сохраняем...' : 'Сохранить изменения'}</button>
           </div>
         )}
       </div>
@@ -295,18 +375,28 @@ function SlotDetailWindow({
   );
 }
 
-export function PerimeterBoard({ board, players, activePlayer, seasonName, currentPosition, hasActiveRun, isAdmin, initialRoll }: BoardProps) {
+export function PerimeterBoard({ board, players, activePlayer, seasonName, currentPosition, hasActiveRun, activeRun, activeGameEffects, activeEffectsPreview, blockedReason, isAdmin, initialRoll }: BoardProps) {
   const [selectedCell, setSelectedCell] = useState<BoardCellData | null>(null);
   const [rollState, setRollState] = useState(initialRoll);
+  const [runtimeBlockedReason, setRuntimeBlockedReason] = useState<string | null>(blockedReason);
+  const [assignmentState, setAssignmentState] = useState<{ runId: string; slotName: string; conditionType: ConditionType } | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const wheelSlots = useMemo(() => board.filter((cell) => cell.type === 'WHEEL').length, [board]);
+  const forcedCondition = useMemo(() => {
+    const preview = activeEffectsPreview.find((effect) => effect.stage === 'before_condition_select' && effect.text.includes('только Base'));
+    return preview ? 'BASE' : null;
+  }, [activeEffectsPreview]);
 
   const handleRoll = () => startTransition(async () => {
     const response = await fetch('/api/board/roll', { method: 'POST' });
-    if (!response.ok) return;
     const payload = await response.json();
-    setRollState({ die1: payload.die1, die2: payload.die2, total: payload.total });
+    if (!response.ok) {
+      setRuntimeBlockedReason(payload.error ?? 'Бросок не удался.');
+      return;
+    }
+    setRuntimeBlockedReason(null);
+    setRollState({ die1: payload.die1, die2: payload.die2, total: payload.total, finalMoveTotal: payload.finalMoveTotal, breakdown: payload.breakdown ?? [] });
     if (payload.landedSlot?.playable) {
       const nextCell = board.find((cell) => cell.id === payload.landedSlot.id);
       if (nextCell) setSelectedCell(nextCell);
@@ -314,13 +404,32 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     router.refresh();
   });
 
-  const handleAssign = (conditionType: 'BASE' | 'GENRE') => startTransition(async () => {
+  const handleAssign = (conditionType: ConditionType) => startTransition(async () => {
     if (!selectedCell) return;
     const response = await fetch('/api/board/assign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slotId: selectedCell.id, conditionType }) });
+    const payload = await response.json();
     if (response.ok) {
       setSelectedCell(null);
+      setAssignmentState({ runId: payload.run.id, slotName: selectedCell.name, conditionType: payload.conditionType });
       router.refresh();
+      return;
     }
+    setRuntimeBlockedReason(payload.error ?? 'Не удалось назначить слот.');
+  });
+
+  const handleConfirmActiveGame = (payload: { runId: string; gameTitle: string; gameUrl: string; playerComment: string }) => startTransition(async () => {
+    const response = await fetch('/api/board/active-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setRuntimeBlockedReason(result.error ?? 'Не удалось сохранить активную игру.');
+      return;
+    }
+    setAssignmentState(null);
+    router.refresh();
   });
 
   const handleSaveSlot = (payload: Record<string, string>) => startTransition(async () => {
@@ -343,22 +452,51 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
               return <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }} className="bg-zinc-950"><BoardTile cell={cell} meta={meta} playersOnCell={playersOnCell} onSelect={setSelectedCell} /></div>;
             })}
             <div className="col-[4_/_9] row-[4_/_9] flex items-center justify-center p-4">
-              <div className="w-full max-w-[300px] rounded-[1.3rem] border border-zinc-700/70 bg-black/60 p-4 text-center shadow-[0_18px_35px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-                <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Igra board</p>
+              <div className="w-full max-w-[320px] rounded-[1.3rem] border border-zinc-700/70 bg-black/60 p-4 text-center shadow-[0_18px_35px_rgba(0,0,0,0.18)] backdrop-blur-sm">
+                <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Поле сезона</p>
                 <h3 className="mt-2 text-xl font-black uppercase leading-tight text-white">{seasonName}</h3>
-                <p className="mt-2 text-xs text-zinc-300">Текущая геометрия поля сохранена. Отсюда же видны wheel-слоты и редактура контента для админа.</p>
+                <p className="mt-2 text-xs text-zinc-300">Ход строится по серверному пайплайну: бросок → эффекты → движение → условия → активная игра.</p>
                 <div className="mt-3 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-3 text-left">
                   <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-200">Сейчас ходит</p>
                   <div className="mt-2 flex items-center gap-3"><PlayerToken player={activePlayer} /><div><p className="font-black text-white">{activePlayer.displayName}</p><p className="text-xs text-zinc-300">Клетка {activePlayer.boardPosition}</p></div></div>
                 </div>
-                <div className="mt-3 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-500/10 px-3 py-3 text-left text-xs text-fuchsia-100">Wheel-слотов на поле: {wheelSlots}. На них по-прежнему можно кликать и редактировать контент без смены layout.</div>
-                <button type="button" onClick={handleRoll} disabled={isPending} className="mt-3 w-full rounded-2xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-100 disabled:cursor-not-allowed disabled:opacity-50">{isPending ? 'Бросаем...' : 'Roll Dice'}</button>
-                {rollState?.total ? <div className="mt-3 rounded-2xl border border-zinc-700 bg-zinc-900/70 px-3 py-3 text-left text-xs text-zinc-200"><p>Кости: {rollState.die1} + {rollState.die2}</p><p className="mt-1 font-bold text-white">Сумма: {rollState.total}</p></div> : null}
+                <div className="mt-3 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-500/10 px-3 py-3 text-left text-xs text-fuchsia-100">Колёс на поле: {wheelSlots}. Слоты редактируются в контексте просмотра, без отдельной CMS.</div>
+                <button type="button" onClick={handleRoll} disabled={isPending || hasActiveRun} className="mt-3 w-full rounded-2xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-100 disabled:cursor-not-allowed disabled:opacity-50">{hasActiveRun ? 'Бросок заблокирован активной игрой' : isPending ? 'Бросаем...' : 'Бросить кости'}</button>
+                {runtimeBlockedReason ? <p className="mt-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-3 text-left text-xs text-amber-100">{runtimeBlockedReason}</p> : null}
+                {rollState?.total ? (
+                  <div className="mt-3 rounded-2xl border border-zinc-700 bg-zinc-900/70 px-3 py-3 text-left text-xs text-zinc-200">
+                    <p>Кости: {rollState.die1} + {rollState.die2}</p>
+                    <p className="mt-1">Базовый бросок: {rollState.total}</p>
+                    {rollState.breakdown?.length ? <div className="mt-2 grid gap-2">{rollState.breakdown.map((entry, index) => <p key={`${entry.itemName}-${index}`} className="text-zinc-300">{entry.itemName}: {entry.delta ? `${entry.delta > 0 ? '+' : ''}${entry.delta}` : entry.text}</p>)}</div> : null}
+                    <p className="mt-2 font-bold text-white">Итоговый ход: {rollState.finalMoveTotal ?? rollState.total}</p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
 
-          {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} canAssign={Boolean(selectedCell.playable && selectedCell.slotNumber === currentPosition && !hasActiveRun)} onAssign={handleAssign} isPending={isPending} isAdmin={isAdmin} onSave={handleSaveSlot} /> : null}
+          {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} canAssign={Boolean(selectedCell.playable && selectedCell.slotNumber === currentPosition && !hasActiveRun)} forcedCondition={forcedCondition} onAssign={handleAssign} isPending={isPending} isAdmin={isAdmin} onSave={handleSaveSlot} /> : null}
+          {assignmentState ? <ActiveGameModal runId={assignmentState.runId} slotName={assignmentState.slotName} conditionType={assignmentState.conditionType} onClose={() => setAssignmentState(null)} onConfirm={handleConfirmActiveGame} isPending={isPending} /> : null}
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-3">
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-4">
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">Активные автоэффекты</p>
+          <div className="mt-3 grid gap-2 text-sm text-zinc-300">
+            {activeEffectsPreview.length ? activeEffectsPreview.map((effect, index) => <div key={`${effect.itemName}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3"><p className="font-semibold text-white">{effect.itemName}</p><p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-500">{getStageLabel(effect.stage)}</p><p className="mt-2 text-sm text-zinc-300">{effect.text}</p></div>) : <p className="text-zinc-500">В инвентаре нет автоэффектов на следующий ход.</p>}
+          </div>
+        </div>
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-4 xl:col-span-2">
+          <p className="text-xs uppercase tracking-[0.25em] text-fuchsia-300">Активная игра и блокировка</p>
+          {activeRun ? (
+            <div className="mt-3 rounded-3xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-4">
+              <p className="text-lg font-black text-white">{activeRun.gameTitle ?? 'Игра ещё не записана'}</p>
+              <p className="mt-2 text-sm text-zinc-200">Слот: {activeRun.slotName} • Условия: {activeRun.conditionType === 'BASE' ? 'Base' : 'Genre'}</p>
+              <p className="mt-2 text-sm text-fuchsia-100">Новый бросок заблокирован, пока эта игра не будет завершена, дропнута или очищена модерацией.</p>
+              {activeGameEffects.length ? <div className="mt-3 grid gap-2 text-sm">{activeGameEffects.map((effect, index) => <div key={`${effect.itemName}-${index}`} className="rounded-2xl border border-zinc-800 bg-black/25 p-3"><p className="font-semibold text-white">{effect.itemName}</p><p className="text-zinc-300">{effect.text}</p></div>)}</div> : null}
+            </div>
+          ) : <p className="mt-3 text-sm text-zinc-400">Активной игры нет — бросок разрешён.</p>}
         </div>
       </div>
     </div>

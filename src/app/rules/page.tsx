@@ -8,6 +8,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentSeason } from '@/lib/server/auth';
 import { ruleSectionSchema } from '@/lib/validation/forms';
+import { glossaryEntries, specialMechanics } from '@/lib/content/game-content';
 
 type Params = { edit?: string; create?: string };
 
@@ -120,6 +121,21 @@ export default async function RulesPage({ searchParams }: { searchParams?: Promi
 
         {isAdmin && params?.create ? <RuleEditor onSubmit={createRuleAction} cancelHref="/rules" /> : null}
         {isAdmin && editingRule ? <RuleEditor rule={editingRule} onSubmit={updateRuleAction} cancelHref="/rules" /> : null}
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <h3 className="text-xl font-bold">Глоссарий</h3>
+            <div className="mt-4 grid gap-3 text-sm">
+              {glossaryEntries.map((entry) => <div key={entry.term} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4"><p className="font-semibold text-white">{entry.term}</p><p className="mt-2 text-zinc-300">{entry.description}</p></div>)}
+            </div>
+          </Card>
+          <Card>
+            <h3 className="text-xl font-bold">Особые механики MVP</h3>
+            <div className="mt-4 grid gap-3 text-sm">
+              {specialMechanics.map((entry) => <div key={entry.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4"><p className="font-semibold text-white">{entry.title}</p><p className="mt-2 text-zinc-300">{entry.description}</p></div>)}
+            </div>
+          </Card>
+        </div>
 
         {sections.map((section: any) => (
           <Card key={section.id} className="select-text">

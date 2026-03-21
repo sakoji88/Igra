@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { prisma } from '@/lib/prisma';
 import { requireSession, getCurrentSeason } from '@/lib/server/auth';
 import { getProfileByUserId, getPlayersList } from '@/lib/server/data';
-import { getItemTypeBadgeClasses, getItemTypeLabel } from '@/lib/server/items';
+import { getItemTypeBadgeClasses, getItemTypeLabel, getItemStageLabel, getTargetLabel, mapInventoryItemsForEffects, consumeInventoryItems } from '@/lib/server/items';
 import { grantThreeWheelSpins } from '@/lib/server/wheel';
 import { upcomingEventSchema, runUpdateSchema } from '@/lib/validation/forms';
+import { resolveActiveGameEffects, resolveScoreEffects } from '@/lib/domain/effect-engine';
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireSession();
@@ -18,9 +19,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   const [user, players] = await Promise.all([getProfileByUserId(id), getPlayersList()]);
   if (!user) notFound();
+  const playerNickname = user.nickname;
   const state = user.seasonStates[0];
-  const activeRun = user.runs.find((run) => run.status === 'ACTIVE');
+  const activeRun = user.runs.find((run) => run.status === 'ACTIVE') ?? null;
   const completedWithoutGift = user.runs.filter((run) => run.status === 'COMPLETED' && !run.wheelSpinsGrantedAt);
+  const runtimeItems = state ? mapInventoryItemsForEffects(state.inventoryItems.map((item) => ({ id: item.id, chargesCurrent: item.chargesCurrent, itemDefinition: { id: item.itemDefinition.id, number: item.itemDefinition.number, name: item.itemDefinition.name, type: item.itemDefinition.type } }))) : [];
+  const activeGameEffects = resolveActiveGameEffects(runtimeItems);
 
   async function updateRunAction(formData: FormData) {
     'use server';
@@ -30,6 +34,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const parsed = runUpdateSchema.parse({ gameTitle: formData.get('gameTitle'), gameUrl: formData.get('gameUrl'), playerComment: formData.get('playerComment') });
     await prisma.runAssignment.update({ where: { id: runId }, data: parsed });
     revalidatePath(`/players/${id}`);
+    revalidatePath('/board');
   }
 
   async function completeRunAction(formData: FormData) {
@@ -38,9 +43,19 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const runId = String(formData.get('runId'));
     const run = await prisma.runAssignment.findUnique({ where: { id: runId } });
     if (!run) return;
+    const state = await prisma.playerSeasonState.findUnique({
+      where: { userId_seasonId: { userId: run.userId, seasonId: season.id } },
+      include: { inventoryItems: { include: { itemDefinition: true }, orderBy: { obtainedAt: 'asc' } } },
+    });
+    if (!state) return;
+    const scoreEffects = resolveScoreEffects({
+      items: mapInventoryItemsForEffects(state.inventoryItems.map((item) => ({ id: item.id, chargesCurrent: item.chargesCurrent, itemDefinition: { id: item.itemDefinition.id, number: item.itemDefinition.number, name: item.itemDefinition.name, type: item.itemDefinition.type } }))),
+      baseScore: run.expectedPoints,
+    });
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'COMPLETED', completedAt: new Date() } });
-    await prisma.playerSeasonState.update({ where: { userId_seasonId: { userId: run.userId, seasonId: season.id } }, data: { score: { increment: run.expectedPoints } } });
-    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${user?.nickname ?? 'Игрок'} завершил ран ${run.slotName} и получил ${run.expectedPoints} очков.` } });
+    await prisma.playerSeasonState.update({ where: { userId_seasonId: { userId: run.userId, seasonId: season.id } }, data: { score: { increment: scoreEffects.finalScore } } });
+    await consumeInventoryItems(scoreEffects.consumedItemIds);
+    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} завершил игру «${run.gameTitle ?? run.slotName}» и получил ${scoreEffects.finalScore} очков.`, payload: { runId, baseScore: run.expectedPoints, scoreEffects: scoreEffects.breakdown, finalScore: scoreEffects.finalScore } } });
     revalidatePath(`/players/${id}`);
     revalidatePath('/board');
   }
@@ -69,8 +84,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const run = await prisma.runAssignment.findUnique({ where: { id: runId } });
     if (!run) return;
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'DROPPED', droppedAt: new Date() } });
-    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${user?.nickname ?? 'Игрок'} дропнул ран ${run.slotName}.` } });
+    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} дропнул игру «${run.gameTitle ?? run.slotName}».` } });
     revalidatePath(`/players/${id}`);
+    revalidatePath('/board');
   }
 
   async function addEventAction(formData: FormData) {
@@ -100,44 +116,52 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <Stat label="Счёт" value={state?.score ?? 0} />
             <Stat label="Позиция" value={state?.boardPosition ?? 0} />
-            <Stat label="Активный ран" value={activeRun ? activeRun.slotName : 'Нет'} />
+            <Stat label="Активная игра" value={activeRun ? 'Есть' : 'Нет'} />
             <Stat label="Роль" value={user.role} />
-            <Stat label="Wheel spins" value={state?.availableWheelSpins ?? 0} />
+            <Stat label="Спины" value={state?.availableWheelSpins ?? 0} />
           </div>
 
-          {activeRun ? (
-            <Card className="mt-6 bg-zinc-900/90">
-              <h3 className="text-xl font-bold">Текущий ран</h3>
-              <form action={updateRunAction} className="mt-4 grid gap-3">
-                <input type="hidden" name="runId" value={activeRun.id} />
-                <input name="gameTitle" defaultValue={activeRun.gameTitle ?? ''} placeholder="Название игры" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
-                <input name="gameUrl" defaultValue={activeRun.gameUrl ?? ''} placeholder="Ссылка на игру / Steam / itch" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
-                <textarea name="playerComment" defaultValue={activeRun.playerComment ?? ''} placeholder="Комментарий игрока" className="min-h-28 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
-                <div className="flex flex-wrap gap-3"><Button type="submit">Сохранить ран</Button></div>
-              </form>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <form action={completeRunAction}><input type="hidden" name="runId" value={activeRun.id} /><Button type="submit">Mark Completed</Button></form>
-                <form action={dropRunAction}><input type="hidden" name="runId" value={activeRun.id} /><Button type="submit" variant="danger">Mark Dropped</Button></form>
-              </div>
-            </Card>
-          ) : null}
+          <Card className="mt-6 bg-zinc-900/90">
+            <h3 className="text-xl font-bold">Активная игра</h3>
+            {activeRun ? (
+              <>
+                <div className="mt-4 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-4">
+                  <p className="text-2xl font-black text-white">{activeRun.gameTitle ?? 'Игра ещё не зафиксирована'}</p>
+                  <p className="mt-2 text-sm text-zinc-200">Слот: {activeRun.slotName} • Условия: {activeRun.conditionType === 'BASE' ? 'Base' : 'Genre'} • Статус: {activeRun.status}</p>
+                  <p className="mt-2 text-sm text-fuchsia-100">Пока эта запись активна, бросок на поле заблокирован и в UI, и на сервере.</p>
+                  {activeGameEffects.length ? <div className="mt-4 grid gap-2">{activeGameEffects.map((effect, index) => <div key={`${effect.itemName}-${index}`} className="rounded-2xl border border-zinc-800 bg-black/25 p-3"><p className="font-semibold text-white">{effect.itemName}</p><p className="text-zinc-300">{effect.text}</p></div>)}</div> : null}
+                </div>
+                <form action={updateRunAction} className="mt-4 grid gap-3">
+                  <input type="hidden" name="runId" value={activeRun.id} />
+                  <input name="gameTitle" defaultValue={activeRun.gameTitle ?? ''} placeholder="Название игры" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
+                  <input name="gameUrl" defaultValue={activeRun.gameUrl ?? ''} placeholder="Ссылка на игру / Steam / itch" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
+                  <textarea name="playerComment" defaultValue={activeRun.playerComment ?? ''} placeholder="Комментарий игрока" className="min-h-28 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
+                  <div className="flex flex-wrap gap-3"><Button type="submit">Сохранить активную игру</Button></div>
+                </form>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <form action={completeRunAction}><input type="hidden" name="runId" value={activeRun.id} /><Button type="submit">Отметить победу</Button></form>
+                  <form action={dropRunAction}><input type="hidden" name="runId" value={activeRun.id} /><Button type="submit" variant="danger">Отметить дроп</Button></form>
+                </div>
+              </>
+            ) : <p className="mt-4 text-sm text-zinc-400">Сейчас активной игры нет. Игрок может вернуться на поле и бросить кости.</p>}
+          </Card>
 
           {completedWithoutGift.length > 0 ? (
             <Card className="mt-6 bg-zinc-900/90">
-              <h3 className="text-xl font-bold">Выдать 3 wheel spins</h3>
-              <p className="mt-2 text-sm text-zinc-400">После completed-рана можно один раз подарить другому игроку ровно 3 спина.</p>
+              <h3 className="text-xl font-bold">Выдать 3 спина колеса</h3>
+              <p className="mt-2 text-sm text-zinc-400">После завершённой игры можно один раз подарить другому игроку ровно 3 спина.</p>
               <div className="mt-4 grid gap-4">
                 {completedWithoutGift.map((run) => (
                   <form key={run.id} action={grantSpinsAction} className="grid gap-3 rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 md:grid-cols-[1fr_260px_auto]">
                     <input type="hidden" name="runId" value={run.id} />
                     <div>
-                      <p className="font-semibold">{run.slotName}</p>
+                      <p className="font-semibold">{run.gameTitle ?? run.slotName}</p>
                       <p className="text-sm text-zinc-400">Завершён {run.completedAt?.toLocaleString('ru-RU') ?? 'только что'}</p>
                     </div>
                     <select name="receiverUserId" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">
                       {players.filter((player) => player.user.id !== id).map((player) => <option key={player.user.id} value={player.user.id}>{player.user.profile?.displayName ?? player.user.nickname}</option>)}
                     </select>
-                    <Button type="submit">Give 3 spins</Button>
+                    <Button type="submit">Подарить 3 спина</Button>
                   </form>
                 ))}
               </div>
@@ -145,14 +169,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           ) : null}
 
           <Card className="mt-6 bg-zinc-900/90">
-            <h3 className="text-xl font-bold">История ранoв</h3>
+            <h3 className="text-xl font-bold">История игр</h3>
             <div className="mt-4 grid gap-3 text-sm">
               {user.runs.map((run) => (
                 <div key={run.id} className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
-                  <p className="font-semibold">Слот {run.slotNumber}: {run.slotName}</p>
-                  <p className="text-zinc-400">{run.conditionType} • {run.status} • {run.expectedPoints} очков</p>
-                  <p className="mt-2 text-zinc-300">Игра: {run.gameTitle ?? 'не заполнено'}</p>
-                  {run.playerComment ? <p className="mt-1 text-zinc-400">Комментарий: {run.playerComment}</p> : null}
+                  <p className="font-semibold">{run.gameTitle ?? `Слот ${run.slotNumber}: ${run.slotName}`}</p>
+                  <p className="text-zinc-400">{run.conditionType} • {run.status} • {run.expectedPoints} базовых очков</p>
+                  {run.playerComment ? <p className="mt-2 text-zinc-300">Комментарий: {run.playerComment}</p> : null}
                   <p className="mt-1 text-xs text-zinc-500">Спины уже подарены: {run.wheelSpinsGrantedAt ? 'да' : 'нет'}</p>
                 </div>
               ))}
@@ -161,17 +184,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </Card>
         <div className="grid gap-6">
           <Card>
-            <h3 className="text-xl font-bold">Wheel state</h3>
+            <h3 className="text-xl font-bold">Сезонное состояние</h3>
             <div className="mt-4 grid gap-3 text-sm">
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">Доступные спины: {state?.availableWheelSpins ?? 0}</div>
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-                <p className="font-semibold">Последние выдачи спинов</p>
+                <p className="font-semibold">Активные эффекты для хода</p>
                 <div className="mt-3 grid gap-2">
-                  {state?.receivedSpinGrants.length ? state.receivedSpinGrants.map((grant) => <p key={grant.id}>{grant.giverState.user.nickname} → +{grant.spinsGranted} ({grant.createdAt.toLocaleString('ru-RU')})</p>) : <p className="text-zinc-500">Подарков пока нет.</p>}
+                  {runtimeItems.length ? runtimeItems.map((item) => <p key={item.inventoryItemId}>#{item.itemDefinition.number} {item.itemDefinition.name}</p>) : <p className="text-zinc-500">Активных предметов пока нет.</p>}
                 </div>
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-                <p className="font-semibold">Последние spin results</p>
+                <p className="font-semibold">Последние прокруты колеса</p>
                 <div className="mt-3 grid gap-2">
                   {state?.wheelSpins.length ? state.wheelSpins.map((spin) => <p key={spin.id}>{spin.wheelEntry.label} • {spin.createdAt.toLocaleString('ru-RU')}</p>) : <p className="text-zinc-500">Спины ещё не крутили.</p>}
                 </div>
@@ -197,7 +220,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">#{item.itemDefinition.number} {item.itemDefinition.name}</p><span className={`rounded-full border px-2 py-1 text-[11px] ${getItemTypeBadgeClasses(item.itemDefinition.type)}`}>{getItemTypeLabel(item.itemDefinition.type)}</span></div>
                     <p className="mt-2 text-sm text-zinc-400">{item.itemDefinition.description}</p>
-                    <p className="mt-2 text-xs text-zinc-500">Заряды: {item.chargesCurrent} • source: {item.sourceType} • targets: {item.itemDefinition.allowedTargets}</p>
+                    <p className="mt-2 text-xs text-zinc-500">Заряды: {item.chargesCurrent} • откуда: {item.sourceType} • цели: {getTargetLabel(item.itemDefinition.allowedTargets)}</p>
                     <p className="mt-1 text-xs text-zinc-500">Получен: {item.obtainedAt.toLocaleString('ru-RU')} • conflictKey: {item.itemDefinition.conflictKey ?? 'нет'}</p>
                   </div>
                 </div>

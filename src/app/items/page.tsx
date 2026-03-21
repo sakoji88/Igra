@@ -7,7 +7,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getItemsCatalog } from '@/lib/server/data';
 import { getCurrentSeason } from '@/lib/server/auth';
-import { getItemTypeBadgeClasses, getItemTypeLabel, getTargetLabel } from '@/lib/server/items';
+import { getItemTypeBadgeClasses, getItemTypeLabel, getTargetLabel, getItemStageLabel, getContentItemMetadata } from '@/lib/server/items';
 import { itemDefinitionSchema } from '@/lib/validation/forms';
 
 type Params = { filter?: string; q?: string; edit?: string; create?: string };
@@ -122,7 +122,9 @@ export default async function ItemsPage({ searchParams }: { searchParams?: Promi
         {isAdmin && editingItem ? <ItemEditor item={editingItem} onSubmit={updateItemAction} onCancelHref={baseHref} /> : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((item: any) => (
+          {filtered.map((item: any) => {
+            const meta = getContentItemMetadata(item.number);
+            return (
             <article key={item.id} className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-5 select-text">
               <img src={item.imageUrl ?? 'https://placehold.co/512x320/111/eee?text=Item'} alt={item.name} className="h-48 w-full rounded-2xl object-cover" />
               <div className="mt-4 flex items-center justify-between gap-3">
@@ -136,6 +138,14 @@ export default async function ItemsPage({ searchParams }: { searchParams?: Promi
                 <p>Ключ конфликта: {item.conflictKey ?? 'нет'}</p>
                 <p>{item.active ? 'Показывается в пуле' : 'Скрыт из публичного пула'}</p>
               </div>
+              {meta?.mechanics?.length ? (
+                <div className="mt-4 rounded-2xl border border-zinc-800 bg-black/20 p-3">
+                  <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Срабатывание</p>
+                  <div className="mt-3 grid gap-2 text-xs text-zinc-300">
+                    {meta.mechanics.map((effect) => <div key={effect.id} className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3"><p className="font-semibold text-white">{getItemStageLabel(effect.triggerStage)}</p><p className="mt-1">{effect.applicationText}</p></div>)}
+                  </div>
+                </div>
+              ) : null}
               {isAdmin ? (
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Link href={`/items?edit=${item.id}${params?.filter ? `&filter=${params.filter}` : ''}${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`} className="rounded-full border border-zinc-700 px-3 py-1 text-sm text-zinc-200">Редактировать</Link>
@@ -147,7 +157,7 @@ export default async function ItemsPage({ searchParams }: { searchParams?: Promi
                 </div>
               ) : null}
             </article>
-          ))}
+          );})}
         </div>
       </div>
     </AppLayout>
