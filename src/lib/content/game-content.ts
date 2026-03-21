@@ -63,7 +63,7 @@ export const coreRuleSections: RuleSectionContent[] = [
     order: 1,
     published: true,
     manualReview: true,
-    rawTextSource: 'docs/rules-and-items.md',
+    rawTextSource: 'Собрано из текущих seed-данных и docs/domain-rules.md, потому что docs/rules-and-items.md отсутствует в checkout.',
     content: 'Игрок ходит только если у него нет активной игры. Ход начинается с броска двух d6, затем сервер применяет все автоматические эффекты предметов, рассчитывает итоговое перемещение, двигает фишку и только после этого разрешает клетку. На игровой клетке игрок выбирает тип условий и сразу фиксирует активную игру для профиля.',
   },
   {
@@ -72,7 +72,7 @@ export const coreRuleSections: RuleSectionContent[] = [
     order: 2,
     published: true,
     manualReview: true,
-    rawTextSource: 'docs/rules-and-items.md',
+    rawTextSource: 'Собрано из требований задачи и текущей логики активного рана.',
     content: 'Пока активная игра не завершена, не дропнута и не очищена судьёй или админом, новый бросок запрещён и в интерфейсе, и на сервере. Профиль и поле обязаны показывать, какая именно игра сейчас блокирует следующий ход.',
   },
   {
@@ -81,7 +81,7 @@ export const coreRuleSections: RuleSectionContent[] = [
     order: 3,
     published: true,
     manualReview: true,
-    rawTextSource: 'docs/rules-and-items.md',
+    rawTextSource: 'Собрано из seed-правил и пользовательского задания.',
     content: 'После перемещения игрок сначала читает последствия клетки, затем выбирает Base или Genre условия, если клетка это допускает. Сразу после выбора открывается следующий шаг: ссылка на настройки GameGauntlets и форма, в которой игрок фиксирует назначенную игру. Эта запись становится активной игрой сезона.',
   },
   {
@@ -90,7 +90,7 @@ export const coreRuleSections: RuleSectionContent[] = [
     order: 4,
     published: true,
     manualReview: true,
-    rawTextSource: 'docs/rules-and-items.md',
+    rawTextSource: 'Собрано из seed-данных, docs/domain-rules.md и требований к effect pipeline.',
     content: 'Предметы обрабатываются по стадиям: before_roll, after_roll, before_move, after_move, before_condition_select, after_condition_select, on_game_assigned, while_game_active и on_score_calculation. Эффекты применяются в детерминированном порядке по приоритету, показываются в разборе хода и могут автоматически тратиться, если так описано в их конфиге.',
   },
   {
@@ -99,7 +99,7 @@ export const coreRuleSections: RuleSectionContent[] = [
     order: 5,
     published: true,
     manualReview: true,
-    rawTextSource: 'docs/rules-and-items.md',
+    rawTextSource: 'Собрано из docs/domain-rules.md и seed-описаний колеса.',
     content: 'Колесо определяется сервером, а клиент только анимирует уже выбранный сектор. Награды попадают в инвентарь игрока или аннигилируются при конфликте по conflictKey. Завершённый ран один раз позволяет подарить другому игроку три спина колеса.',
   },
   {
@@ -108,7 +108,7 @@ export const coreRuleSections: RuleSectionContent[] = [
     order: 6,
     published: true,
     manualReview: true,
-    rawTextSource: 'docs/rules-and-items.md',
+    rawTextSource: 'Собрано из docs/domain-rules.md и текущей доменной логики.',
     content: 'Очки всегда считаются на сервере. Базовая стоимость стороны поля умножается на 2 для Genre-условий, а затем к результату применяются эффекты предметов стадии on_score_calculation. Если ход замкнул круг, бонус за проход через старт тоже считается сервером.',
   },
 ];
@@ -129,25 +129,25 @@ export const specialMechanics = [
 
 export const contentItemDefinitions: ContentItemDefinition[] = [
   {
-    id: 'easy-eyes', number: 1, name: 'Лёгкие глаза', type: 'BUFF', description: 'Следующий ход ощущается комфортнее: итоговое перемещение игрока увеличивается на 1.', shortLabel: '+1 ход', imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: 'eyes', active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'easy-eyes-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: 1, priority: 80, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Лёгкие глаза добавляют +1 к итоговому перемещению.' }],
+    id: 'easy-eyes', number: 1, name: 'Лёгкие глаза', type: 'BUFF', description: 'Следующий ход ощущается комфортнее: итоговое перемещение игрока увеличивается на 1.', shortLabel: '+1 ход', imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: 'eyes', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'easy-eyes-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: 1, priority: 80, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Лёгкие глаза добавляют +1 к итоговому перемещению.' }],
   },
   {
-    id: 'blindfold-curse', number: 2, name: 'Проклятие слепой повязки', type: 'DEBUFF', description: 'Следующий ход становится тяжелее: итоговое перемещение игрока уменьшается на 1.', shortLabel: '-1 ход', imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self,other', conflictKey: 'eyes', active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'blindfold-curse-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: -1, priority: 85, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Проклятие слепой повязки отнимает 1 клетку от итогового перемещения.' }],
+    id: 'blindfold-curse', number: 2, name: 'Проклятие слепой повязки', type: 'DEBUFF', description: 'Следующий ход становится тяжелее: итоговое перемещение игрока уменьшается на 1.', shortLabel: '-1 ход', imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self,other', conflictKey: 'eyes', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'blindfold-curse-move', triggerStage: 'after_roll', effectType: 'move_modifier', value: -1, priority: 85, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Проклятие слепой повязки отнимает 1 клетку от итогового перемещения.' }],
   },
   {
-    id: 'chill-playlist', number: 3, name: 'Чилловый плейлист', type: 'BUFF', description: 'Помогает держать темп до конца активной игры: после победы игрок получает +1 очко сверху.', shortLabel: '+1 очко', imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: 'focus', active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'chill-playlist-active-tag', triggerStage: 'while_game_active', effectType: 'active_game_note', value: 'Чилловый плейлист помогает не тильтовать и обещает +1 очко за победу.', priority: 40, stackable: false, oneTime: false, consumption: 'on_run_resolved', applicationText: 'Чилловый плейлист активен до завершения текущей игры.' }, { id: 'chill-playlist-score', triggerStage: 'on_score_calculation', effectType: 'score_modifier', value: 1, priority: 70, stackable: false, oneTime: true, consumption: 'on_run_resolved', applicationText: 'Чилловый плейлист добавляет +1 очко к награде за активную игру.' }],
+    id: 'chill-playlist', number: 3, name: 'Чилловый плейлист', type: 'BUFF', description: 'Помогает держать темп до конца активной игры: после победы игрок получает +1 очко сверху.', shortLabel: '+1 очко', imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: 'focus', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'chill-playlist-active-tag', triggerStage: 'while_game_active', effectType: 'active_game_note', value: 'Чилловый плейлист помогает не тильтовать и обещает +1 очко за победу.', priority: 40, stackable: false, oneTime: false, consumption: 'on_run_resolved', applicationText: 'Чилловый плейлист активен до завершения текущей игры.' }, { id: 'chill-playlist-score', triggerStage: 'on_score_calculation', effectType: 'score_modifier', value: 1, priority: 70, stackable: false, oneTime: true, consumption: 'on_run_resolved', applicationText: 'Чилловый плейлист добавляет +1 очко к награде за активную игру.' }],
   },
   {
-    id: 'doomscroll-storm', number: 4, name: 'Думскролл-шторм', type: 'DEBUFF', description: 'Съедает концентрацию: завершённая игра приносит на 1 очко меньше.', shortLabel: '-1 очко', imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self,other', conflictKey: 'focus', active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'doomscroll-active-tag', triggerStage: 'while_game_active', effectType: 'active_game_note', value: 'Думскролл-шторм мешает сконцентрироваться и готовит -1 очко при завершении.', priority: 45, stackable: false, oneTime: false, consumption: 'on_run_resolved', applicationText: 'Думскролл-шторм висит до конца активной игры.' }, { id: 'doomscroll-score', triggerStage: 'on_score_calculation', effectType: 'score_modifier', value: -1, priority: 75, stackable: false, oneTime: true, consumption: 'on_run_resolved', applicationText: 'Думскролл-шторм отнимает 1 очко от награды за игру.' }],
+    id: 'doomscroll-storm', number: 4, name: 'Думскролл-шторм', type: 'DEBUFF', description: 'Съедает концентрацию: завершённая игра приносит на 1 очко меньше.', shortLabel: '-1 очко', imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self,other', conflictKey: 'focus', active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'doomscroll-active-tag', triggerStage: 'while_game_active', effectType: 'active_game_note', value: 'Думскролл-шторм мешает сконцентрироваться и готовит -1 очко при завершении.', priority: 45, stackable: false, oneTime: false, consumption: 'on_run_resolved', applicationText: 'Думскролл-шторм висит до конца активной игры.' }, { id: 'doomscroll-score', triggerStage: 'on_score_calculation', effectType: 'score_modifier', value: -1, priority: 75, stackable: false, oneTime: true, consumption: 'on_run_resolved', applicationText: 'Думскролл-шторм отнимает 1 очко от награды за игру.' }],
   },
   {
-    id: 'banana-mine', number: 5, name: 'Банановая мина', type: 'TRAP', description: 'Ловушка на следующий ход: игрок делает на 2 клетки меньше.', shortLabel: '-2 ход', imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'other', conflictKey: null, active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'banana-mine-move', triggerStage: 'before_move', effectType: 'move_modifier', value: -2, priority: 90, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Банановая мина заставляет потерять 2 клетки движения.' }],
+    id: 'banana-mine', number: 5, name: 'Банановая мина', type: 'TRAP', description: 'Ловушка на следующий ход: игрок делает на 2 клетки меньше.', shortLabel: '-2 ход', imageUrl: 'https://images.unsplash.com/photo-1574226516831-e1dff420e37f?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'other', conflictKey: null, active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'banana-mine-move', triggerStage: 'before_move', effectType: 'move_modifier', value: -2, priority: 90, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Банановая мина заставляет потерять 2 клетки движения.' }],
   },
   {
-    id: 'toxic-spoiler', number: 6, name: 'Токсичный спойлер', type: 'TRAP', description: 'Следующее назначение можно взять только по Base-условиям.', shortLabel: 'Только Base', imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'other', conflictKey: null, active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'toxic-spoiler-lock', triggerStage: 'before_condition_select', effectType: 'condition_lock', value: 'BASE', priority: 95, stackable: false, oneTime: true, consumption: 'on_assignment_created', applicationText: 'Токсичный спойлер оставляет игроку только Base-условия для следующего назначения.' }],
+    id: 'toxic-spoiler', number: 6, name: 'Токсичный спойлер', type: 'TRAP', description: 'Следующее назначение можно взять только по Base-условиям.', shortLabel: 'Только Base', imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'other', conflictKey: null, active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'toxic-spoiler-lock', triggerStage: 'before_condition_select', effectType: 'condition_lock', value: 'BASE', priority: 95, stackable: false, oneTime: true, consumption: 'on_assignment_created', applicationText: 'Токсичный спойлер оставляет игроку только Base-условия для следующего назначения.' }],
   },
   {
-    id: 'clean-reroll-vibe', number: 7, name: 'Чистый реролл вайба', type: 'NEUTRAL', description: 'Если сумма двух d6 получилась 5 или меньше, предмет добавляет ещё +2 клетки движения.', shortLabel: '+2 при 5-', imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: null, active: true, manualReview: true, rawTextSource: 'docs/rules-and-items.md', mechanics: [{ id: 'clean-reroll-vibe-move', triggerStage: 'after_roll', effectType: 'conditional_move_modifier', value: 2, priority: 60, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Чистый реролл вайба добавляет +2, потому что бросок был 5 или меньше.', conditions: { maxRawRoll: 5 } }],
+    id: 'clean-reroll-vibe', number: 7, name: 'Чистый реролл вайба', type: 'NEUTRAL', description: 'Если сумма двух d6 получилась 5 или меньше, предмет добавляет ещё +2 клетки движения.', shortLabel: '+2 при 5-', imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=400&q=80', chargesDefault: 1, allowedTargets: 'self', conflictKey: null, active: true, manualReview: true, rawTextSource: 'Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.', mechanics: [{ id: 'clean-reroll-vibe-move', triggerStage: 'after_roll', effectType: 'conditional_move_modifier', value: 2, priority: 60, stackable: false, oneTime: true, consumption: 'on_trigger', applicationText: 'Чистый реролл вайба добавляет +2, потому что бросок был 5 или меньше.', conditions: { maxRawRoll: 5 } }],
   },
 ];
 

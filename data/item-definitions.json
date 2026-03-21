@@ -12,7 +12,7 @@
     "conflictKey":"eyes",
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"easy-eyes-move","triggerStage":"after_roll","effectType":"move_modifier","value":1,"priority":80,"stackable":false,"oneTime":true,"consumption":"on_trigger","applicationText":"Лёгкие глаза добавляют +1 к итоговому перемещению."}
     ]
@@ -30,7 +30,7 @@
     "conflictKey":"eyes",
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"blindfold-curse-move","triggerStage":"after_roll","effectType":"move_modifier","value":-1,"priority":85,"stackable":false,"oneTime":true,"consumption":"on_trigger","applicationText":"Проклятие слепой повязки отнимает 1 клетку от итогового перемещения."}
     ]
@@ -48,7 +48,7 @@
     "conflictKey":"focus",
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"chill-playlist-active-tag","triggerStage":"while_game_active","effectType":"active_game_note","value":"Чилловый плейлист помогает не тильтовать и обещает +1 очко за победу.","priority":40,"stackable":false,"oneTime":false,"consumption":"on_run_resolved","applicationText":"Чилловый плейлист активен до завершения текущей игры."},
       {"id":"chill-playlist-score","triggerStage":"on_score_calculation","effectType":"score_modifier","value":1,"priority":70,"stackable":false,"oneTime":true,"consumption":"on_run_resolved","applicationText":"Чилловый плейлист добавляет +1 очко к награде за активную игру."}
@@ -67,7 +67,7 @@
     "conflictKey":"focus",
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"doomscroll-active-tag","triggerStage":"while_game_active","effectType":"active_game_note","value":"Думскролл-шторм мешает сконцентрироваться и готовит -1 очко при завершении.","priority":45,"stackable":false,"oneTime":false,"consumption":"on_run_resolved","applicationText":"Думскролл-шторм висит до конца активной игры."},
       {"id":"doomscroll-score","triggerStage":"on_score_calculation","effectType":"score_modifier","value":-1,"priority":75,"stackable":false,"oneTime":true,"consumption":"on_run_resolved","applicationText":"Думскролл-шторм отнимает 1 очко от награды за игру."}
@@ -86,7 +86,7 @@
     "conflictKey":null,
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"banana-mine-move","triggerStage":"before_move","effectType":"move_modifier","value":-2,"priority":90,"stackable":false,"oneTime":true,"consumption":"on_trigger","applicationText":"Банановая мина заставляет потерять 2 клетки движения."}
     ]
@@ -104,7 +104,7 @@
     "conflictKey":null,
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"toxic-spoiler-lock","triggerStage":"before_condition_select","effectType":"condition_lock","value":"BASE","priority":95,"stackable":false,"oneTime":true,"consumption":"on_assignment_created","applicationText":"Токсичный спойлер оставляет игроку только Base-условия для следующего назначения."}
     ]
@@ -122,7 +122,7 @@
     "conflictKey":null,
     "active":true,
     "manualReview":true,
-    "rawTextSource":"docs/rules-and-items.md",
+    "rawTextSource":"Текущий seed-предмет, механика уточнена для MVP из-за отсутствия docs/rules-and-items.md.",
     "mechanics":[
       {"id":"clean-reroll-vibe-move","triggerStage":"after_roll","effectType":"conditional_move_modifier","value":2,"priority":60,"stackable":false,"oneTime":true,"consumption":"on_trigger","conditions":{"maxRawRoll":5},"applicationText":"Чистый реролл вайба добавляет +2, потому что бросок был 5 или меньше."}
     ]
