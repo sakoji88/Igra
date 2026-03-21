@@ -1,5 +1,7 @@
-import type { BoardSlot, SlotSide, SlotType } from '@prisma/client';
 import { boardCells } from '../../../prisma/seed-data.ts';
+
+type SlotSide = 'BOTTOM' | 'LEFT' | 'TOP' | 'RIGHT';
+type SlotType = 'START' | 'REGULAR' | 'RANDOM' | 'JAIL' | 'LOTTERY' | 'AUCTION' | 'PODLYANKA' | 'KAIFARIK' | 'WHEEL';
 
 export function getSlotSide(slotNumber: number): SlotSide {
   if (slotNumber >= 0 && slotNumber <= 10) return 'BOTTOM';
@@ -27,7 +29,7 @@ export function getSlotFallback(type: SlotType) {
   return '🎮';
 }
 
-export function isPlayableSlot(slot: Pick<BoardSlot, 'type'>) {
+export function isPlayableSlot(slot: { type: SlotType }) {
   return slot.type === 'REGULAR' || slot.type === 'RANDOM';
 }
 

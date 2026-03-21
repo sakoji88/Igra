@@ -1,9 +1,17 @@
-import type { ItemDefinition, ItemType, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+
+type ItemType = 'BUFF' | 'DEBUFF' | 'TRAP' | 'NEUTRAL';
+type ItemDefinitionLike = {
+  id: string;
+  name: string;
+  type: ItemType;
+  conflictKey: string | null;
+  chargesDefault: number;
+};
 
 export async function grantItemToState(params: {
   playerSeasonStateId: string;
-  itemDefinition: ItemDefinition;
+  itemDefinition: ItemDefinitionLike;
   sourceType: string;
   sourceReferenceId?: string | null;
   seasonId: string;
@@ -76,6 +84,20 @@ export function getItemTypeBadgeClasses(type: ItemType) {
   if (type === 'DEBUFF') return 'border-red-400/40 bg-red-500/10 text-red-100';
   if (type === 'TRAP') return 'border-amber-400/40 bg-amber-500/10 text-amber-100';
   return 'border-cyan-400/40 bg-cyan-500/10 text-cyan-100';
+}
+
+export function getItemTypeLabel(type: ItemType) {
+  if (type === 'BUFF') return 'Бафф';
+  if (type === 'DEBUFF') return 'Дебафф';
+  if (type === 'TRAP') return 'Ловушка';
+  return 'Нейтрал';
+}
+
+export function getTargetLabel(value: string) {
+  if (value === 'self') return 'Себе';
+  if (value === 'other') return 'Другому игроку';
+  if (value === 'self,other') return 'Себе или другому';
+  return value;
 }
 
 export function normalizeStringList(value: string) {

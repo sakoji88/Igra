@@ -21,7 +21,15 @@ body {
 
 * { box-sizing: border-box; }
 
+body :not(input):not(textarea):not([contenteditable='true']) {
+  caret-color: transparent;
+}
+
 a { color: inherit; text-decoration: none; }
+
+button, a, img, svg {
+  user-select: none;
+}
 
 .meme-border {
   border: 1px solid rgb(244 114 182 / 0.4);

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { prisma } from '@/lib/prisma';
 import { requireSession, getCurrentSeason } from '@/lib/server/auth';
 import { getProfileByUserId, getPlayersList } from '@/lib/server/data';
-import { getItemTypeBadgeClasses } from '@/lib/server/items';
+import { getItemTypeBadgeClasses, getItemTypeLabel } from '@/lib/server/items';
 import { grantThreeWheelSpins } from '@/lib/server/wheel';
 import { upcomingEventSchema, runUpdateSchema } from '@/lib/validation/forms';
 
@@ -195,7 +195,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 <div key={item.id} className="flex gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
                   <img src={item.itemDefinition.imageUrl ?? 'https://placehold.co/96x96/111/eee?text=Item'} alt="item" className="h-20 w-20 rounded-2xl object-cover" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">#{item.itemDefinition.number} {item.itemDefinition.name}</p><span className={`rounded-full border px-2 py-1 text-[11px] ${getItemTypeBadgeClasses(item.itemDefinition.type)}`}>{item.itemDefinition.type}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">#{item.itemDefinition.number} {item.itemDefinition.name}</p><span className={`rounded-full border px-2 py-1 text-[11px] ${getItemTypeBadgeClasses(item.itemDefinition.type)}`}>{getItemTypeLabel(item.itemDefinition.type)}</span></div>
                     <p className="mt-2 text-sm text-zinc-400">{item.itemDefinition.description}</p>
                     <p className="mt-2 text-xs text-zinc-500">Заряды: {item.chargesCurrent} • source: {item.sourceType} • targets: {item.itemDefinition.allowedTargets}</p>
                     <p className="mt-1 text-xs text-zinc-500">Получен: {item.obtainedAt.toLocaleString('ru-RU')} • conflictKey: {item.itemDefinition.conflictKey ?? 'нет'}</p>

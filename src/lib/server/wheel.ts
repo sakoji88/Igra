@@ -17,7 +17,7 @@ export async function spinWheelForState(playerSeasonStateId: string) {
   });
   if (!wheel || wheel.entries.length === 0) throw new Error('Активное колесо не настроено.');
 
-  const selected = pickWeightedValue(wheel.entries);
+  const selected = pickWeightedValue<typeof wheel.entries[number]>(wheel.entries);
 
   const spin = await prisma.$transaction(async (tx) => {
     const freshState = await tx.playerSeasonState.findUnique({ where: { id: state.id } });

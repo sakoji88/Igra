@@ -56,7 +56,10 @@ async function main() {
   await prisma.ruleSection.createMany({ data: defaultRules });
 
   const itemDefinitions = await prisma.itemDefinition.findMany();
-  const itemByNumber = new Map(itemDefinitions.map((item) => [item.number, item.id]));
+  const itemByNumber = new Map<number, string>();
+  for (const item of itemDefinitions) {
+    itemByNumber.set(item.number, item.id);
+  }
 
   const wheel = await prisma.wheelDefinition.create({
     data: {
