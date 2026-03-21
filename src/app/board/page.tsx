@@ -10,7 +10,16 @@ export default async function BoardPage() {
   const session = await requireSession();
   const { season, slots, states, logs } = await getBoardViewData();
   const current = await getCurrentUserState(session.user.id!);
-  if (!current) throw new Error('Current player state not found');
+  if (!current) {
+    return (
+      <AppLayout>
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-6">
+          <h2 className="text-2xl font-black">Состояние игрока пока не готово</h2>
+          <p className="mt-3 text-zinc-400">Перелогинься после сида или создай игрока заново, если база была пересобрана.</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   const board = slots.map((slot) => ({
     id: slot.id,

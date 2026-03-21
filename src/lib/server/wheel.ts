@@ -3,29 +3,55 @@ import { pickWeightedValue } from '@/lib/domain/game';
 import { ensureActiveWheelDefinition } from '@/lib/server/data';
 import { grantItemToState } from '@/lib/server/items';
 
-export async function spinWheelForState(playerSeasonStateId: string) {
+export type WheelPool = 'PRIKOLY' | 'BUFFS' | 'DEBUFFS' | 'BREDIK';
+
+function getPoolEntries(
+  wheel: Awaited<ReturnType<typeof ensureActiveWheelDefinition>>,
+  pool: WheelPool,
+) {
+  const linked = wheel.entries.filter((entry) => entry.itemDefinition);
+
+  if (pool === 'PRIKOLY') {
+    return linked.filter((entry) => (entry.itemDefinition?.number ?? 0) <= 56);
+  }
+  if (pool === 'BUFFS') {
+    return linked.filter((entry) => (entry.itemDefinition?.number ?? 0) <= 56 && entry.itemDefinition?.type === 'BUFF');
+  }
+  if (pool === 'DEBUFFS') {
+    return linked.filter((entry) => (entry.itemDefinition?.number ?? 0) <= 56 && (entry.itemDefinition?.type === 'DEBUFF' || entry.itemDefinition?.type === 'TRAP'));
+  }
+  return linked.filter((entry) => (entry.itemDefinition?.number ?? 0) >= 57);
+}
+
+export async function spinWheelForState(playerSeasonStateId: string, pool: WheelPool = 'PRIKOLY') {
   const state = await prisma.playerSeasonState.findUnique({
     where: { id: playerSeasonStateId },
     include: { user: true, season: true },
   });
   if (!state) throw new Error('Состояние игрока не найдено.');
-  if (state.availableWheelSpins <= 0) throw new Error('Нет доступных спинов.');
+  if (pool === 'PRIKOLY' && state.availableWheelSpins <= 0) throw new Error('Нет доступных круток приколов.');
 
   const wheel = await ensureActiveWheelDefinition();
   if (!wheel || wheel.entries.length === 0) throw new Error('Активное колесо не настроено.');
 
-  const selected = pickWeightedValue<typeof wheel.entries[number]>(wheel.entries);
+  const poolEntries = getPoolEntries(wheel, pool);
+  if (poolEntries.length === 0) throw new Error('Для выбранного раздела пока нет доступных пунктов.');
+
+  const selected = pickWeightedValue<typeof poolEntries[number]>(poolEntries);
 
   const spin = await prisma.$transaction(async (tx) => {
     const freshState = await tx.playerSeasonState.findUnique({ where: { id: state.id } });
-    if (!freshState || freshState.availableWheelSpins <= 0) throw new Error('Спины закончились раньше, чем завершился запрос.');
+    if (!freshState) throw new Error('Состояние игрока пропало во время запроса.');
+    if (pool === 'PRIKOLY' && freshState.availableWheelSpins <= 0) throw new Error('Крутки закончились раньше, чем завершился запрос.');
 
-    await tx.playerSeasonState.update({
-      where: { id: state.id },
-      data: { availableWheelSpins: { decrement: 1 } },
-    });
+    if (pool === 'PRIKOLY') {
+      await tx.playerSeasonState.update({
+        where: { id: state.id },
+        data: { availableWheelSpins: { decrement: 1 } },
+      });
+    }
 
-    const createdSpin = await tx.wheelSpin.create({
+    return tx.wheelSpin.create({
       data: {
         seasonId: state.seasonId,
         playerSeasonStateId: state.id,
@@ -34,37 +60,28 @@ export async function spinWheelForState(playerSeasonStateId: string) {
       },
       include: { wheelEntry: { include: { itemDefinition: true } }, wheelDefinition: true },
     });
-
-    return createdSpin;
   });
 
-  let inventoryOutcome: Awaited<ReturnType<typeof grantItemToState>> | null = null;
-  if (selected.rewardType === 'ITEM' && selected.itemDefinition) {
-    inventoryOutcome = await grantItemToState({
-      playerSeasonStateId: state.id,
-      itemDefinition: selected.itemDefinition,
-      sourceType: 'WHEEL',
-      sourceReferenceId: spin.id,
-      seasonId: state.seasonId,
-      userId: state.userId,
-    });
-  }
-
-  if (selected.rewardType === 'SPINS' && selected.rewardSpins) {
-    await prisma.playerSeasonState.update({ where: { id: state.id }, data: { availableWheelSpins: { increment: selected.rewardSpins } } });
-  }
+  const inventoryOutcome = await grantItemToState({
+    playerSeasonStateId: state.id,
+    itemDefinition: selected.itemDefinition!,
+    sourceType: pool,
+    sourceReferenceId: spin.id,
+    seasonId: state.seasonId,
+    userId: state.userId,
+  });
 
   await prisma.eventLog.create({
     data: {
       seasonId: state.seasonId,
       userId: state.userId,
       type: 'WHEEL',
-      summary: `${state.user.nickname} прокрутил колесо и получил сектор «${selected.label}».`,
+      summary: `${state.user.nickname} получил пункт «${selected.label}» из раздела ${pool}.`,
       payload: {
+        pool,
         wheelId: wheel.id,
         wheelEntryId: selected.id,
-        rewardType: selected.rewardType,
-        rewardSpins: selected.rewardSpins ?? null,
+        itemDefinitionId: selected.itemDefinition?.id ?? null,
         inventoryOutcome: inventoryOutcome?.outcome ?? null,
       },
     },
@@ -75,6 +92,7 @@ export async function spinWheelForState(playerSeasonStateId: string) {
     wheel,
     entry: selected,
     inventoryOutcome,
+    pool,
   };
 }
 

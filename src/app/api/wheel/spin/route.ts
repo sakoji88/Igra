@@ -1,14 +1,22 @@
 export const dynamic = 'force-dynamic';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentSeason } from '@/lib/server/auth';
 import { ensurePlayerSeasonState } from '@/lib/server/data';
-import { spinWheelForState } from '@/lib/server/wheel';
+import { spinWheelForState, type WheelPool } from '@/lib/server/wheel';
 
-export async function POST() {
+function normalizePool(value: unknown): WheelPool {
+  if (value === 'BUFFS' || value === 'DEBUFFS' || value === 'BREDIK') return value;
+  return 'PRIKOLY';
+}
+
+export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await request.json().catch(() => ({}));
+  const pool = normalizePool(body?.pool);
 
   const season = await getCurrentSeason();
   await ensurePlayerSeasonState(session.user.id);
@@ -16,10 +24,11 @@ export async function POST() {
   if (!state) return NextResponse.json({ error: 'State not found' }, { status: 404 });
 
   try {
-    const result = await spinWheelForState(state.id);
+    const result = await spinWheelForState(state.id, pool);
     return NextResponse.json({
       spinId: result.spinId,
       wheelId: result.wheel.id,
+      pool: result.pool,
       entry: {
         id: result.entry.id,
         label: result.entry.label,
