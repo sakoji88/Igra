@@ -66,6 +66,7 @@ type BoardProps = {
   activeEffectsPreview: EffectPreview[];
   blockedReason: string | null;
   isAdmin: boolean;
+  isInJail: boolean;
   initialRoll?: { die1: number | null; die2: number | null; total: number | null; finalMoveTotal?: number | null; breakdown?: EffectBreakdownEntry[] };
 };
 
@@ -351,7 +352,7 @@ function SlotDetailWindow({
             <div className="mt-4 flex flex-wrap gap-3">
               <button type="button" disabled={!canAssign || isPending || forcedCondition === 'GENRE'} onClick={() => onAssign('BASE')} className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">Выбрать Base</button>
               <button type="button" disabled={!canAssign || isPending || forcedCondition === 'BASE'} onClick={() => onAssign('GENRE')} className="rounded-full border border-pink-400/40 bg-pink-500/10 px-4 py-2 text-sm text-pink-100 disabled:cursor-not-allowed disabled:opacity-40">Выбрать Genre</button>
-              {!canAssign ? <p className="text-xs text-zinc-500">Игру можно назначить только на текущей игровой клетке и только если у игрока нет активной игры.</p> : null}
+              {!canAssign ? <p className="text-xs text-zinc-500">Игру можно назначить только на текущей клетке, если у игрока нет активной игры. Тюремный слот после дропа тоже считается допустимым.</p> : null}
             </div>
           </>
         ) : (
@@ -375,7 +376,7 @@ function SlotDetailWindow({
   );
 }
 
-export function PerimeterBoard({ board, players, activePlayer, seasonName, currentPosition, hasActiveRun, activeRun, activeGameEffects, activeEffectsPreview, blockedReason, isAdmin, initialRoll }: BoardProps) {
+export function PerimeterBoard({ board, players, activePlayer, seasonName, currentPosition, hasActiveRun, activeRun, activeGameEffects, activeEffectsPreview, blockedReason, isAdmin, isInJail, initialRoll }: BoardProps) {
   const [selectedCell, setSelectedCell] = useState<BoardCellData | null>(null);
   const [rollState, setRollState] = useState(initialRoll);
   const [runtimeBlockedReason, setRuntimeBlockedReason] = useState<string | null>(blockedReason);
@@ -461,7 +462,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
                   <div className="mt-2 flex items-center gap-3"><PlayerToken player={activePlayer} /><div><p className="font-black text-white">{activePlayer.displayName}</p><p className="text-xs text-zinc-300">Клетка {activePlayer.boardPosition}</p></div></div>
                 </div>
                 <div className="mt-3 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-500/10 px-3 py-3 text-left text-xs text-fuchsia-100">Колёс на поле: {wheelSlots}. Слоты редактируются в контексте просмотра, без отдельной CMS.</div>
-                <button type="button" onClick={handleRoll} disabled={isPending || hasActiveRun} className="mt-3 w-full rounded-2xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-100 disabled:cursor-not-allowed disabled:opacity-50">{hasActiveRun ? 'Бросок заблокирован активной игрой' : isPending ? 'Бросаем...' : 'Бросить кости'}</button>
+                <button type="button" onClick={handleRoll} disabled={isPending || hasActiveRun || isInJail} className="mt-3 w-full rounded-2xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-100 disabled:cursor-not-allowed disabled:opacity-50">{hasActiveRun ? 'Бросок заблокирован активной игрой' : isInJail ? 'Сначала закрой тюремный слот' : isPending ? 'Бросаем...' : 'Бросить кости'}</button>
                 {runtimeBlockedReason ? <p className="mt-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-3 text-left text-xs text-amber-100">{runtimeBlockedReason}</p> : null}
                 {rollState?.total ? (
                   <div className="mt-3 rounded-2xl border border-zinc-700 bg-zinc-900/70 px-3 py-3 text-left text-xs text-zinc-200">
@@ -475,7 +476,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
             </div>
           </div>
 
-          {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} canAssign={Boolean(selectedCell.playable && selectedCell.slotNumber === currentPosition && !hasActiveRun)} forcedCondition={forcedCondition} onAssign={handleAssign} isPending={isPending} isAdmin={isAdmin} onSave={handleSaveSlot} /> : null}
+          {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} canAssign={Boolean((selectedCell.playable || (isInJail && selectedCell.type === 'JAIL')) && selectedCell.slotNumber === currentPosition && !hasActiveRun)} forcedCondition={forcedCondition} onAssign={handleAssign} isPending={isPending} isAdmin={isAdmin} onSave={handleSaveSlot} /> : null}
           {assignmentState ? <ActiveGameModal runId={assignmentState.runId} slotName={assignmentState.slotName} conditionType={assignmentState.conditionType} onClose={() => setAssignmentState(null)} onConfirm={handleConfirmActiveGame} isPending={isPending} /> : null}
         </div>
       </div>

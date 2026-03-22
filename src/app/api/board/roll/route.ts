@@ -20,6 +20,10 @@ export async function POST() {
 
   if (!state) return NextResponse.json({ error: 'State not found' }, { status: 404 });
 
+  if (state.jailReason) {
+    return NextResponse.json({ error: 'Игрок сейчас в тюрьме после дропа. Сначала закрой тюремный слот или попроси судью/админа скорректировать состояние.' }, { status: 400 });
+  }
+
   const activeRun = await prisma.runAssignment.findFirst({
     where: { userId: session.user.id, seasonId: season.id, status: 'ACTIVE' },
     orderBy: { assignedAt: 'desc' },
@@ -49,6 +53,7 @@ export async function POST() {
   const updated = await prisma.playerSeasonState.update({
     where: { id: state.id },
     data: {
+      previousBoardPosition: state.boardPosition,
       boardPosition: moved.nextPosition,
       lastDie1: die1,
       lastDie2: die2,

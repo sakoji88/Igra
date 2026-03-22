@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
   ]);
 
   if (!state) return NextResponse.json({ error: 'State not found' }, { status: 404 });
-  if (!slot || slot.seasonId !== season.id || !isPlayableSlot(slot)) {
+  const canAssignJail = Boolean(slot && slot.type === 'JAIL' && state.jailReason);
+  if (!slot || slot.seasonId !== season.id || (!isPlayableSlot(slot) && !canAssignJail)) {
     return NextResponse.json({ error: 'Слот недоступен для обычного рана.' }, { status: 400 });
   }
 
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       seasonId: season.id,
       userId: session.user.id,
       type: 'RUN',
-      summary: `${session.user.name} выбрал ${conditionType === 'BASE' ? 'Base' : 'Genre'} условия для слота ${slot.slotNumber}.`,
+      summary: `${session.user.name} выбрал ${conditionType === 'BASE' ? 'Base' : 'Genre'} условия для слота ${slot.slotNumber}${slot.type === 'JAIL' ? ' (тюрьма после дропа)' : ''}.`,
       payload: { slotId: slot.id, conditionType, expectedPoints, conditionEffects: conditionEffects.breakdown },
     },
   });

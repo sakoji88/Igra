@@ -116,6 +116,8 @@ model PlayerSeasonState {
   seasonId       String
   score          Int      @default(0)
   boardPosition  Int      @default(0)
+  previousBoardPosition Int?
+  jailReason     String?
   availableWheelSpins Int @default(0)
   lastDie1       Int?
   lastDie2       Int?

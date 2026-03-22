@@ -53,9 +53,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       baseScore: run.expectedPoints,
     });
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'COMPLETED', completedAt: new Date() } });
-    await prisma.playerSeasonState.update({ where: { userId_seasonId: { userId: run.userId, seasonId: season.id } }, data: { score: { increment: scoreEffects.finalScore } } });
+    await prisma.playerSeasonState.update({
+      where: { userId_seasonId: { userId: run.userId, seasonId: season.id } },
+      data: {
+        score: { increment: scoreEffects.finalScore },
+        ...(run.slotName === 'Тюрьма' ? { jailReason: null } : {}),
+      },
+    });
     await consumeInventoryItems(scoreEffects.consumedItemIds);
-    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} завершил игру «${run.gameTitle ?? run.slotName}» и получил ${scoreEffects.finalScore} очков.`, payload: { runId, baseScore: run.expectedPoints, scoreEffects: scoreEffects.breakdown, finalScore: scoreEffects.finalScore } } });
+    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} завершил игру «${run.gameTitle ?? run.slotName}» и получил ${scoreEffects.finalScore} очков.${run.slotName === 'Тюрьма' ? ' Тюремный статус снят.' : ''}`, payload: { runId, baseScore: run.expectedPoints, scoreEffects: scoreEffects.breakdown, finalScore: scoreEffects.finalScore, clearedJail: run.slotName === 'Тюрьма' } } });
     revalidatePath(`/players/${id}`);
     revalidatePath('/board');
   }
@@ -83,8 +89,25 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const runId = String(formData.get('runId'));
     const run = await prisma.runAssignment.findUnique({ where: { id: runId } });
     if (!run) return;
+    const [state, jailSlot] = await Promise.all([
+      prisma.playerSeasonState.findUnique({ where: { userId_seasonId: { userId: run.userId, seasonId: season.id } } }),
+      prisma.boardSlot.findFirst({ where: { seasonId: season.id, type: 'JAIL' }, orderBy: { slotNumber: 'asc' } }),
+    ]);
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'DROPPED', droppedAt: new Date() } });
-    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} дропнул игру «${run.gameTitle ?? run.slotName}».` } });
+    if (state && jailSlot) {
+      if (state.boardPosition === jailSlot.slotNumber) {
+        await prisma.playerSeasonState.update({
+          where: { id: state.id },
+          data: { score: { decrement: 2 }, jailReason: 'DROP' },
+        });
+      } else {
+        await prisma.playerSeasonState.update({
+          where: { id: state.id },
+          data: { previousBoardPosition: state.boardPosition, boardPosition: jailSlot.slotNumber, jailReason: 'DROP' },
+        });
+      }
+    }
+    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} дропнул игру «${run.gameTitle ?? run.slotName}»${state && jailSlot ? state.boardPosition === jailSlot.slotNumber ? ' и получил штраф -2 очка за повторный дроп в тюрьме.' : ' и был отправлен в Тюрьму.' : '.'}`, payload: { runId, sentToJail: Boolean(state && jailSlot), jailSlotNumber: jailSlot?.slotNumber ?? null } } });
     revalidatePath(`/players/${id}`);
     revalidatePath('/board');
   }
@@ -116,10 +139,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <Stat label="Счёт" value={state?.score ?? 0} />
             <Stat label="Позиция" value={state?.boardPosition ?? 0} />
+            <Stat label="Тюрьма" value={state?.jailReason ? 'Да' : 'Нет'} />
             <Stat label="Активная игра" value={activeRun ? 'Есть' : 'Нет'} />
             <Stat label="Роль" value={user.role} />
             <Stat label="Спины" value={state?.availableWheelSpins ?? 0} />
           </div>
+
+          {state?.jailReason ? <Card className="mt-6 border-orange-500/40 bg-orange-500/10"><h3 className="text-xl font-bold text-orange-50">Статус тюрьмы</h3><p className="mt-2 text-sm text-orange-100">Игрок сейчас в тюрьме после дропа. Новый бросок заблокирован, пока он не закроет тюремный слот или судья/админ не исправит состояние вручную.</p><p className="mt-3 text-xs text-orange-200/80">Последняя сохранённая клетка до отправки в тюрьму: {state.previousBoardPosition ?? 'неизвестно'}.</p></Card> : null}
 
           <Card className="mt-6 bg-zinc-900/90">
             <h3 className="text-xl font-bold">Активная игра</h3>

@@ -74,8 +74,9 @@ export default async function BoardPage() {
             activeRun={activeRun ? { id: activeRun.id, slotName: activeRun.slotName, gameTitle: activeRun.gameTitle, conditionType: activeRun.conditionType } : null}
             activeEffectsPreview={activeEffectsPreview.map((effect) => ({ itemName: effect.itemName, stage: effect.stage, text: effect.text }))}
             activeGameEffects={activeGameEffects}
-            blockedReason={activeRun ? `Активная игра «${activeRun.gameTitle ?? activeRun.slotName}» блокирует новый бросок.` : null}
+            blockedReason={activeRun ? `Активная игра «${activeRun.gameTitle ?? activeRun.slotName}» блокирует новый бросок.` : current.jailReason ? 'Игрок сидит в тюрьме после дропа. Открой клетку «Тюрьма», назначь тюремный ран или попроси админа снять статус.' : null}
             isAdmin={session.user.role === 'ADMIN'}
+            isInJail={Boolean(current.jailReason)}
             initialRoll={{ die1: current.lastDie1, die2: current.lastDie2, total: current.lastRollTotal, finalMoveTotal: current.lastRollTotal }}
           />
         </CardShell>
@@ -83,6 +84,7 @@ export default async function BoardPage() {
           <CardShell title="Текущий статус" subtitle="Сервер хранит позицию, счёт, активную игру, автоэффекты и спины колеса.">
             <div className="grid gap-3 text-sm text-zinc-300">
               <div className="rounded-2xl bg-zinc-900/70 p-4">Позиция: {current.boardPosition}</div>
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Тюремный статус: {current.jailReason ? 'Да' : 'Нет'}</div>
               <div className="rounded-2xl bg-zinc-900/70 p-4">Счёт: {current.score}</div>
               <div className="rounded-2xl bg-zinc-900/70 p-4">Активная игра: {activeRun ? `${activeRun.gameTitle ?? 'Не записана'} • ${activeRun.slotName}` : 'Нет'}</div>
               <div className="rounded-2xl bg-zinc-900/70 p-4">Спины колеса: {current.availableWheelSpins}</div>
