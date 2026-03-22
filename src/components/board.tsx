@@ -186,12 +186,17 @@ function CellPlayerMarkers({ players, side, isCorner }: { players: BoardPlayerDa
 }
 
 function SlotArtwork({ cell, isCorner }: { cell: BoardCellData; isCorner: boolean }) {
-  if (cell.imageUrl) {
-    return <div className="h-full w-full rounded-[1rem] bg-cover bg-center" style={{ backgroundImage: `url(${cell.imageUrl})` }} />;
-  }
   return (
-    <div className="flex h-full w-full items-center justify-center rounded-[1rem] border border-white/10 bg-black/20">
-      <span className={cn('drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]', isCorner ? 'text-5xl' : 'text-4xl')}>{cell.imageFallback}</span>
+    <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[1rem] border border-white/10 bg-black/20 p-2">
+      {cell.imageUrl ? (
+        <img
+          src={cell.imageUrl}
+          alt={cell.name}
+          className={cn('max-h-full max-w-full object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]', isCorner ? 'scale-110' : 'scale-100')}
+        />
+      ) : (
+        <span className={cn('leading-none drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]', isCorner ? 'text-5xl' : 'text-4xl')}>{cell.imageFallback}</span>
+      )}
     </div>
   );
 }
@@ -210,9 +215,9 @@ function BoardTile({ cell, meta, playersOnCell, onSelect }: { cell: BoardCellDat
       aria-label={`Открыть слот ${cell.slotNumber}: ${cell.name}`}
     >
       <div className="flex items-start justify-between">
-        <span className={cn('bg-black/45 px-2 py-1 font-black tracking-[0.28em] text-white/90', meta.isCorner ? 'text-[10px]' : 'text-[9px]')}>
-          {cell.slotNumber === 0 ? '0 / 40' : cell.slotNumber}
-        </span>
+        {cell.slotNumber === 0 ? <span /> : <span className={cn('bg-black/45 px-2 py-1 font-black tracking-[0.28em] text-white/90', meta.isCorner ? 'text-[10px]' : 'text-[9px]')}>
+          {cell.slotNumber}
+        </span>}
       </div>
       <div className="mt-2 flex-1"><SlotArtwork cell={cell} isCorner={meta.isCorner} /></div>
       <CellPlayerMarkers players={playersOnCell} side={meta.side} isCorner={meta.isCorner} />
