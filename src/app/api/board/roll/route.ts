@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { moveOnBoard } from '@/lib/domain/game';
-import { resolveRollEffects } from '@/lib/domain/effect-engine';
+import { resolveRollEffects, resolveRollMode } from '@/lib/domain/effect-engine';
 import { getCurrentSeason } from '@/lib/server/auth';
 import { isPlayableSlot } from '@/lib/server/board';
 import { consumeInventoryItems, mapInventoryItemsForEffects } from '@/lib/server/items';
@@ -39,15 +39,26 @@ export async function POST() {
     }, { status: 400 });
   }
 
+  const runtimeItems = mapInventoryItemsForEffects(state.inventoryItems);
+  const seasonStates = await prisma.playerSeasonState.findMany({ where: { seasonId: season.id, user: { role: 'PLAYER' } }, orderBy: [{ score: 'desc' }, { updatedAt: 'asc' }] });
+  const playerRank = Math.max(1, seasonStates.findIndex((entry) => entry.id === state.id) + 1 || 1);
+  const rollMode = resolveRollMode(runtimeItems);
   const die1 = Math.floor(Math.random() * 6) + 1;
   const die2 = Math.floor(Math.random() * 6) + 1;
+  const die3 = rollMode.rollMode === 'THREE_D6_KEEP_BEST_TWO' ? Math.floor(Math.random() * 6) + 1 : null;
+  const chosenDice = rollMode.rollMode === 'THREE_D6_KEEP_BEST_TWO' && die3 ? [die1, die2, die3].sort((a, b) => b - a).slice(0, 2) : [die1, die2];
   const effectResolution = resolveRollEffects({
-    items: mapInventoryItemsForEffects(state.inventoryItems),
-    die1,
-    die2,
+    items: runtimeItems,
+    die1: chosenDice[0]!,
+    die2: chosenDice[1]!,
+    die3,
+    playerRank,
+    totalPlayers: seasonStates.length,
+    coinFlip: runtimeItems.some((item) => item.itemDefinition.number === 43) ? (Math.random() < 0.5 ? 'HEADS' : 'TAILS') : undefined,
   });
   const boardSize = await prisma.boardSlot.count({ where: { seasonId: season.id } });
-  const moved = moveOnBoard(state.boardPosition, effectResolution.finalMoveTotal, boardSize);
+  const movementValue = effectResolution.movedBackwards ? (boardSize - (effectResolution.finalMoveTotal % boardSize || boardSize)) : effectResolution.finalMoveTotal;
+  const moved = moveOnBoard(state.boardPosition, movementValue, boardSize);
   const slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: moved.nextPosition } } });
 
   const updated = await prisma.playerSeasonState.update({
@@ -55,40 +66,44 @@ export async function POST() {
     data: {
       previousBoardPosition: state.boardPosition,
       boardPosition: moved.nextPosition,
-      lastDie1: die1,
-      lastDie2: die2,
+      lastDie1: effectResolution.die1,
+      lastDie2: effectResolution.die2,
       lastRollTotal: effectResolution.finalMoveTotal,
     },
   });
 
-  await consumeInventoryItems(effectResolution.consumedItemIds);
+  await consumeInventoryItems([...rollMode.consumedItemIds, ...effectResolution.consumedItemIds]);
 
   await prisma.eventLog.create({
     data: {
       seasonId: season.id,
       userId: session.user.id,
       type: 'TURN',
-      summary: `${session.user.name} бросил ${die1} + ${die2} и дошёл до слота ${moved.nextPosition}${slot ? ` — ${slot.name}` : ''}.`,
+      summary: `${session.user.name} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${moved.nextPosition}${slot ? ` — ${slot.name}` : ''}.`,
       payload: {
         kind: 'ROLL_RESULT',
         from: state.boardPosition,
         to: moved.nextPosition,
         passedStart: moved.passedStart,
-        die1,
-        die2,
+        die1: effectResolution.die1,
+        die2: effectResolution.die2,
+        die3,
         rawRollTotal: effectResolution.rawRollTotal,
         finalMoveTotal: effectResolution.finalMoveTotal,
-        breakdown: effectResolution.breakdown,
+        movedBackwards: effectResolution.movedBackwards,
+        breakdown: [...rollMode.breakdown, ...effectResolution.breakdown],
       },
     },
   });
 
   return NextResponse.json({
-    die1,
-    die2,
+    die1: effectResolution.die1,
+    die2: effectResolution.die2,
+    die3,
     total: effectResolution.rawRollTotal,
     finalMoveTotal: effectResolution.finalMoveTotal,
-    breakdown: effectResolution.breakdown,
+    movedBackwards: effectResolution.movedBackwards,
+    breakdown: [...rollMode.breakdown, ...effectResolution.breakdown],
     state: updated,
     landedSlot: slot ? {
       id: slot.id,

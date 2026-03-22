@@ -10,7 +10,7 @@ import { getProfileByUserId, getPlayersList } from '@/lib/server/data';
 import { getItemTypeBadgeClasses, getItemTypeLabel, getItemStageLabel, getTargetLabel, mapInventoryItemsForEffects, consumeInventoryItems } from '@/lib/server/items';
 import { grantThreeWheelSpins } from '@/lib/server/wheel';
 import { upcomingEventSchema, runUpdateSchema } from '@/lib/validation/forms';
-import { resolveActiveGameEffects, resolveScoreEffects } from '@/lib/domain/effect-engine';
+import { resolveActiveGameEffects, resolveDropEffects, resolveScoreEffects } from '@/lib/domain/effect-engine';
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireSession();
@@ -51,6 +51,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const scoreEffects = resolveScoreEffects({
       items: mapInventoryItemsForEffects(state.inventoryItems.map((item) => ({ id: item.id, chargesCurrent: item.chargesCurrent, itemDefinition: { id: item.itemDefinition.id, number: item.itemDefinition.number, name: item.itemDefinition.name, type: item.itemDefinition.type } }))),
       baseScore: run.expectedPoints,
+      lastDie1: state.lastDie1,
+      lastDie2: state.lastDie2,
+      passedStart: false,
     });
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'COMPLETED', completedAt: new Date() } });
     await prisma.playerSeasonState.update({
@@ -95,7 +98,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ]);
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'DROPPED', droppedAt: new Date() } });
     if (state && jailSlot) {
-      if (state.boardPosition === jailSlot.slotNumber) {
+      const inventoryItems = await prisma.playerInventoryItem.findMany({ where: { playerSeasonStateId: state.id }, include: { itemDefinition: true } });
+      const dropEffects = resolveDropEffects({
+        items: mapInventoryItemsForEffects(inventoryItems.map((item) => ({ id: item.id, chargesCurrent: item.chargesCurrent, itemDefinition: { id: item.itemDefinition.id, number: item.itemDefinition.number, name: item.itemDefinition.name, type: item.itemDefinition.type } }))),
+        previousBoardPosition: state.previousBoardPosition,
+        jailSlotNumber: jailSlot.slotNumber,
+      });
+      await consumeInventoryItems(dropEffects.consumedItemIds);
+      if (state.boardPosition === jailSlot.slotNumber && dropEffects.destination === jailSlot.slotNumber) {
         await prisma.playerSeasonState.update({
           where: { id: state.id },
           data: { score: { decrement: 2 }, jailReason: 'DROP' },
@@ -103,11 +113,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       } else {
         await prisma.playerSeasonState.update({
           where: { id: state.id },
-          data: { previousBoardPosition: state.boardPosition, boardPosition: jailSlot.slotNumber, jailReason: 'DROP' },
+          data: { previousBoardPosition: state.boardPosition, boardPosition: dropEffects.destination, jailReason: dropEffects.jailReason },
         });
       }
+      await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} дропнул игру «${run.gameTitle ?? run.slotName}»${dropEffects.destination === 0 ? ' и Дырявый парашют отправил его на Старт.' : dropEffects.destination === (state.previousBoardPosition ?? -1) && !dropEffects.jailReason ? ' и Туалетка вернула его на предыдущую клетку.' : state.boardPosition === jailSlot.slotNumber ? ' и получил штраф -2 очка за повторный дроп в тюрьме.' : ' и был отправлен в Тюрьму.'}`, payload: { runId, destination: dropEffects.destination, jailSlotNumber: jailSlot.slotNumber, dropEffects: dropEffects.breakdown } } });
+    } else {
+      await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} дропнул игру «${run.gameTitle ?? run.slotName}».` } });
     }
-    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} дропнул игру «${run.gameTitle ?? run.slotName}»${state && jailSlot ? state.boardPosition === jailSlot.slotNumber ? ' и получил штраф -2 очка за повторный дроп в тюрьме.' : ' и был отправлен в Тюрьму.' : '.'}`, payload: { runId, sentToJail: Boolean(state && jailSlot), jailSlotNumber: jailSlot?.slotNumber ?? null } } });
     revalidatePath(`/players/${id}`);
     revalidatePath('/board');
   }

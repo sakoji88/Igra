@@ -83,7 +83,21 @@ export async function grantItemToState(params: {
 
 export async function consumeInventoryItems(inventoryItemIds: string[]) {
   if (inventoryItemIds.length === 0) return;
-  await prisma.playerInventoryItem.deleteMany({ where: { id: { in: inventoryItemIds } } });
+  const grouped = inventoryItemIds.reduce<Record<string, number>>((acc, id) => {
+    acc[id] = (acc[id] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  for (const [id, consumeCount] of Object.entries(grouped)) {
+    const item = await prisma.playerInventoryItem.findUnique({ where: { id } });
+    if (!item) continue;
+    const nextCharges = item.chargesCurrent - consumeCount;
+    if (nextCharges > 0) {
+      await prisma.playerInventoryItem.update({ where: { id }, data: { chargesCurrent: nextCharges } });
+      continue;
+    }
+    await prisma.playerInventoryItem.delete({ where: { id } });
+  }
 }
 
 export function mapInventoryItemsForEffects(

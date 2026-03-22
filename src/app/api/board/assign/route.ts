@@ -37,7 +37,10 @@ export async function POST(request: NextRequest) {
 
   const conditionEffects = resolveConditionSelectionEffects(mapInventoryItemsForEffects(state.inventoryItems));
   const conditionType = conditionEffects.lockedConditionType ?? requestedConditionType;
-  const expectedPoints = conditionType === 'GENRE' ? getSideBasePoints(slot.side) * 2 : getSideBasePoints(slot.side);
+  const sideBasePoints = getSideBasePoints(slot.side);
+  const expectedPoints = conditionType === 'GENRE'
+    ? conditionEffects.scorePreviewOverride === 'BASE_POINTS_FOR_GENRE' ? sideBasePoints : sideBasePoints * 2
+    : sideBasePoints;
 
   const run = await prisma.runAssignment.create({
     data: {

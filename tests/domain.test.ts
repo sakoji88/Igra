@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyEffects, calculateScore, moveOnBoard, pickWeightedValue, roll2d6, transitionAssignment } from '../src/lib/domain/game.ts';
-import { resolveActiveGameEffects, resolveConditionSelectionEffects, resolveRollEffects } from '../src/lib/domain/effect-engine.ts';
+import { resolveActiveGameEffects, resolveConditionSelectionEffects, resolveDropEffects, resolveRollEffects, resolveRollMode, resolveScoreEffects } from '../src/lib/domain/effect-engine.ts';
 
 const runtimeItems = [
   { inventoryItemId: 'i14', chargesCurrent: 2, itemDefinition: { id: '14', number: 14, name: 'Тухлая шаурма', type: 'TRAP' as const } },
@@ -52,7 +52,9 @@ test('weighted wheel selection is server-deterministic for a provided random val
 
 test('effect engine resolves roll modifiers deterministically', () => {
   const result = resolveRollEffects({ items: runtimeItems, die1: 2, die2: 3 });
-  assert.equal(result.rawRollTotal, 5);
+  assert.equal(result.die1, 1);
+  assert.equal(result.die2, 2);
+  assert.equal(result.rawRollTotal, 3);
   assert.equal(result.finalMoveTotal, 3);
   assert.deepEqual(result.consumedItemIds, ['i14']);
 });
@@ -67,4 +69,55 @@ test('effect engine exposes active-game notes for manual items', () => {
   const result = resolveActiveGameEffects(runtimeItems);
   assert.equal(result.length, 1);
   assert.equal(result[0]?.itemName, 'Повязка Рэмбо');
+});
+
+
+test('effect engine applies huebik and notebook rules deterministically', () => {
+  const result = resolveRollEffects({
+    items: [
+      { inventoryItemId: 'i2', chargesCurrent: 1, itemDefinition: { id: '2', number: 2, name: 'Кубик хуёбика', type: 'DEBUFF' as const } },
+      { inventoryItemId: 'i25', chargesCurrent: 1, itemDefinition: { id: '25', number: 25, name: 'Плюсовый блокнот', type: 'BUFF' as const } },
+    ],
+    die1: 6,
+    die2: 6,
+  });
+  assert.equal(result.die1, 1);
+  assert.equal(result.die2, 6);
+  assert.equal(result.finalMoveTotal, 7);
+});
+
+test('effect engine selects special roll modes', () => {
+  assert.equal(resolveRollMode([{ inventoryItemId: 'i42', chargesCurrent: 1, itemDefinition: { id: '42', number: 42, name: 'Бог любит троицу', type: 'BUFF' as const } }]).rollMode, 'THREE_D6_KEEP_BEST_TWO');
+  assert.equal(resolveRollMode([{ inventoryItemId: 'i58', chargesCurrent: 1, itemDefinition: { id: '58', number: 58, name: 'Кроссовки без подошвы', type: 'DEBUFF' as const } }]).rollMode, 'REVERSE_2D6');
+});
+
+test('effect engine handles genre flatten and double-six score bonus', () => {
+  const condition = resolveConditionSelectionEffects([{ inventoryItemId: 'i55', chargesCurrent: 1, itemDefinition: { id: '55', number: 55, name: 'УВЫ', type: 'DEBUFF' as const } }]);
+  assert.equal(condition.scorePreviewOverride, 'BASE_POINTS_FOR_GENRE');
+
+  const score = resolveScoreEffects({
+    items: [{ inventoryItemId: 'i25', chargesCurrent: 1, itemDefinition: { id: '25', number: 25, name: 'Плюсовый блокнот', type: 'BUFF' as const } }],
+    baseScore: 4,
+    lastDie1: 6,
+    lastDie2: 6,
+  });
+  assert.equal(score.finalScore, 5);
+});
+
+test('effect engine resolves drop redirects', () => {
+  const toilet = resolveDropEffects({
+    items: [{ inventoryItemId: 'i19', chargesCurrent: 1, itemDefinition: { id: '19', number: 19, name: 'Туалетка', type: 'BUFF' as const } }],
+    previousBoardPosition: 12,
+    jailSlotNumber: 10,
+  });
+  assert.equal(toilet.destination, 12);
+  assert.equal(toilet.jailReason, null);
+
+  const parachute = resolveDropEffects({
+    items: [{ inventoryItemId: 'i21', chargesCurrent: 1, itemDefinition: { id: '21', number: 21, name: 'Дырявый парашют', type: 'DEBUFF' as const } }],
+    previousBoardPosition: 12,
+    jailSlotNumber: 10,
+  });
+  assert.equal(parachute.destination, 0);
+  assert.equal(parachute.jailReason, null);
 });
