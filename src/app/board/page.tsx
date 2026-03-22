@@ -1,0 +1,112 @@
+export const dynamic = 'force-dynamic';
+import { AppLayout } from '@/components/layout';
+import { PerimeterBoard } from '@/components/board';
+import { requireSession } from '@/lib/server/auth';
+import { getBoardViewData, getCurrentUserState } from '@/lib/server/data';
+import { getActiveEffectsPreview, resolveActiveGameEffects } from '@/lib/domain/effect-engine';
+import { mapInventoryItemsForEffects } from '@/lib/server/items';
+
+export default async function BoardPage() {
+  const session = await requireSession();
+  const { season, slots, states, logs } = await getBoardViewData();
+  const current = await getCurrentUserState(session.user.id!);
+  if (!current) {
+    return (
+      <AppLayout>
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-6">
+          <h2 className="text-2xl font-black">Состояние игрока пока не готово</h2>
+          <p className="mt-3 text-zinc-400">Перелогинься после сида или создай игрока заново, если база была пересобрана.</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const board = slots.map((slot) => ({
+    id: slot.id,
+    index: slot.slotNumber,
+    slotNumber: slot.slotNumber,
+    name: slot.name,
+    type: slot.type,
+    side: slot.side.toLowerCase() as 'bottom' | 'left' | 'top' | 'right',
+    points: slot.side === 'BOTTOM' ? 1 : slot.side === 'LEFT' ? 2 : slot.side === 'TOP' ? 3 : 4,
+    imageUrl: slot.imageUrl,
+    imageFallback: slot.imageFallback,
+    baseConditions: slot.baseConditions,
+    genreConditions: slot.genreConditions,
+    description: slot.description ?? undefined,
+    playable: slot.isPlayable,
+    isPublished: slot.isPublished,
+  }));
+
+  const players = states.map((state) => ({
+    id: state.user.id,
+    displayName: state.user.profile?.displayName ?? state.user.nickname,
+    avatarUrl: state.user.avatarUrl ?? `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(state.user.nickname)}`,
+    boardPosition: state.boardPosition,
+    isActivePlayer: state.user.id === session.user.id,
+  }));
+
+  const activeRun = current.user.runs.find((run) => run.status === 'ACTIVE') ?? null;
+  const runtimeItems = mapInventoryItemsForEffects(current.inventoryItems.map((item) => ({
+    id: item.id,
+    chargesCurrent: item.chargesCurrent,
+    itemDefinition: {
+      id: item.itemDefinition.id,
+      number: item.itemDefinition.number,
+      name: item.itemDefinition.name,
+      type: item.itemDefinition.type,
+    },
+  })));
+  const activeEffectsPreview = getActiveEffectsPreview(runtimeItems);
+  const activeGameEffects = resolveActiveGameEffects(runtimeItems);
+
+  return (
+    <AppLayout>
+      <div className="grid gap-6 xl:grid-cols-[2.15fr_0.85fr]">
+        <CardShell title="Игровое поле" subtitle="Полный цикл игрока: бросок, автоэффекты, движение, выбор условий и фиксация активной игры прямо на поле.">
+          <PerimeterBoard
+            board={board}
+            players={players}
+            activePlayer={players.find((player) => player.id === session.user.id)!}
+            seasonName={season.name}
+            currentPosition={current.boardPosition}
+            hasActiveRun={Boolean(activeRun)}
+            activeRun={activeRun ? { id: activeRun.id, slotName: activeRun.slotName, gameTitle: activeRun.gameTitle, conditionType: activeRun.conditionType } : null}
+            activeEffectsPreview={activeEffectsPreview.map((effect) => ({ itemName: effect.itemName, stage: effect.stage, text: effect.text }))}
+            activeGameEffects={activeGameEffects}
+            blockedReason={activeRun ? `Активная игра «${activeRun.gameTitle ?? activeRun.slotName}» блокирует новый бросок.` : current.jailReason ? 'Игрок сидит в тюрьме после дропа. Открой клетку «Тюрьма», назначь тюремный ран или попроси админа снять статус.' : null}
+            isAdmin={session.user.role === 'ADMIN'}
+            isInJail={Boolean(current.jailReason)}
+            initialRoll={{ die1: current.lastDie1, die2: current.lastDie2, total: current.lastRollTotal, finalMoveTotal: current.lastRollTotal }}
+          />
+        </CardShell>
+        <div className="grid gap-6">
+          <CardShell title="Текущий статус" subtitle="Сервер хранит позицию, счёт, активную игру, автоэффекты и спины колеса.">
+            <div className="grid gap-3 text-sm text-zinc-300">
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Позиция: {current.boardPosition}</div>
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Тюремный статус: {current.jailReason ? 'Да' : 'Нет'}</div>
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Счёт: {current.score}</div>
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Активная игра: {activeRun ? `${activeRun.gameTitle ?? 'Не записана'} • ${activeRun.slotName}` : 'Нет'}</div>
+              <div className="rounded-2xl bg-zinc-900/70 p-4">Спины колеса: {current.availableWheelSpins}</div>
+            </div>
+          </CardShell>
+          <CardShell title="Последние события" subtitle="Локальный журнал сезона.">
+            <div className="grid gap-3 text-sm">
+              {logs.slice(0, 8).map((event) => <div key={event.id} className="rounded-2xl bg-zinc-900/70 p-3"><p>{event.summary}</p></div>)}
+            </div>
+          </CardShell>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+function CardShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <div className="meme-border rounded-3xl bg-zinc-950/90 p-5">
+      <h2 className="text-2xl font-black">{title}</h2>
+      <p className="mt-2 text-sm text-zinc-400">{subtitle}</p>
+      <div className="mt-5">{children}</div>
+    </div>
+  );
+}
