@@ -34,8 +34,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           }}
           className="mt-6 grid gap-4"
         >
-          <input name="nickname" type="text" placeholder="Никнейм" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
-          <input name="password" type="password" placeholder="Пароль" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+          <input name="nickname" type="text" required minLength={3} maxLength={32} placeholder="Никнейм" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+          <input name="password" type="password" required minLength={6} placeholder="Пароль" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
           <Button type="submit">Войти</Button>
         </form>
         <p className="mt-5 text-sm text-zinc-400">

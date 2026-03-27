@@ -2,6 +2,8 @@ import { boardCells } from '../../../prisma/seed-data.ts';
 
 type SlotSide = 'BOTTOM' | 'LEFT' | 'TOP' | 'RIGHT';
 type SlotType = 'START' | 'REGULAR' | 'RANDOM' | 'JAIL' | 'LOTTERY' | 'AUCTION' | 'PODLYANKA' | 'KAIFARIK' | 'WHEEL';
+export const QUESTION_SLOT_NUMBERS = new Set([5, 15, 25, 35]);
+export const CHAOS_WHEEL_SLOT_NUMBERS = new Set([2, 12, 22, 32]);
 
 export function getSlotSide(slotNumber: number): SlotSide {
   if (slotNumber >= 0 && slotNumber <= 10) return 'BOTTOM';
@@ -31,6 +33,14 @@ export function getSlotFallback(type: SlotType) {
 
 export function isPlayableSlot(slot: { type: SlotType }) {
   return slot.type === 'REGULAR' || slot.type === 'RANDOM';
+}
+
+export function isQuestionSlot(slotNumber: number) {
+  return QUESTION_SLOT_NUMBERS.has(slotNumber);
+}
+
+export function isChaosWheelSlot(slotNumber: number) {
+  return CHAOS_WHEEL_SLOT_NUMBERS.has(slotNumber);
 }
 
 export function buildSlotConditions(name: string, side: SlotSide, type: SlotType) {

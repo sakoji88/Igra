@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 type BoardSlotSide = 'bottom' | 'left' | 'top' | 'right';
 type BoardSlotType = 'START' | 'REGULAR' | 'RANDOM' | 'JAIL' | 'LOTTERY' | 'AUCTION' | 'PODLYANKA' | 'KAIFARIK' | 'WHEEL';
 type ConditionType = 'BASE' | 'GENRE';
+type SpecialLandingType = 'AUCTION' | 'LOTTERY' | 'QUESTION' | 'CHAOS_WHEEL' | 'START';
 
 type BoardCellData = {
   id: string;
@@ -69,6 +70,23 @@ type BoardProps = {
   isInJail: boolean;
   initialRoll?: { die1: number | null; die2: number | null; total: number | null; finalMoveTotal?: number | null; breakdown?: EffectBreakdownEntry[] };
 };
+
+const questionSlots = new Set([5, 15, 25, 35]);
+const chaosWheelSlots = new Set([2, 12, 22, 32]);
+const chaosWheelConditions = [
+  'Получите +1 к итоговому значению следующего броска.',
+  'Получите -1 к итоговому значению следующего броска.',
+  'Получите +2 к итоговому значению следующего броска.',
+  'Получите -2 к итоговому значению следующего броска.',
+  'Переместитесь на клетку "Аукциона" и пройдите там игру.',
+  'Переместитесь на клетку "Лотерея" и пройдите там игру.',
+  'Переместитесь на клетку "Фул рандом" с противоположной от вас стороны и пройдите там игру.',
+  'Получите 1 поинт.',
+  'Потеряйте 1 поинт.',
+  'Верхний порог времени следующей клетки ниже на 2 часа.',
+  'Текущее преодоление всего игрового поля дает лишь 2 поинта, вместо 5.',
+  'Вернитесь на клетку, с которой вы начинали текущий ход и совершите ход заново, сохранив эффекты событий и предметов, влияющих на движение.',
+] as const;
 
 type CellMeta = {
   gridColumn: number;
@@ -381,8 +399,111 @@ function SlotDetailWindow({
   );
 }
 
+function AchievementToast({ text }: { text: string }) {
+  return (
+    <div className="pointer-events-none absolute bottom-4 left-4 z-50 max-w-sm rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur">
+      🏆 {text}
+    </div>
+  );
+}
+
+function SpecialSlotModal({
+  cell,
+  type,
+  isPending,
+  onClose,
+  onCreate,
+}: {
+  cell: BoardCellData;
+  type: SpecialLandingType;
+  isPending: boolean;
+  onClose: () => void;
+  onCreate: (payload: { gameTitle: string; gameUrl: string; playerComment: string }) => void;
+}) {
+  const [gameTitle, setGameTitle] = useState('');
+  const [gameUrl, setGameUrl] = useState('https://gamegauntlets.com/#settings');
+  const [playerComment, setPlayerComment] = useState('');
+  const [lotteryRoll, setLotteryRoll] = useState<number | null>(null);
+  const [chaosResult, setChaosResult] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const heading = type === 'AUCTION'
+    ? 'Аукционная'
+    : type === 'LOTTERY'
+      ? 'Лотерея'
+      : type === 'QUESTION'
+        ? 'Клетка вопросика'
+        : type === 'CHAOS_WHEEL'
+          ? 'Подлянка / Кайфарик'
+          : 'Старт x Финиш';
+
+  const description = type === 'AUCTION'
+    ? 'На 20 слоте (аукционной) не должно быть выбора условий, там все игроки будут внешне в колесо на стороннем сайте вписывать от себя 10 игр, с длительность от часа до 25, награда за прохождение аукционной 3 поинта, после попадения на аукционную появляется окно с информацией о клетке, и там сразу можно вписать игру, после того как игроки наролят всё.'
+    : type === 'LOTTERY'
+      ? 'Лотерея - как игрок встает на слот, открывается окно с описание лотереи, есть в окне кнопка с выпадением числа в диапазоне от 1 до 31, что соответствует количеству уникальных пресетов на сайте https://gamegauntlets.com/#settings, после чего игрок крутит игру из пресета соответствующему выпавшему числу, номинальная награда за прохождение - 3 поинта.'
+      : type === 'QUESTION'
+        ? 'Добавить клетки вопросиков (5,15,25,35 клетки) высвечивается окно для ввода игры, эти клетки обозначают, что игрок роллит игру на сайте https://gamegauntlets.com без каких либо особенностей.'
+        : type === 'CHAOS_WHEEL'
+          ? 'Нет слотов подлянок и кайфариков (2, 12, 22, 32 слот) суть слотов в крутке из 12 условий, из бафов и дебафов, когда игрок попадает на слот, высвечивается окно с описание слота, и кнопкой крутки, выпадает одна из 12 подлянок или кайфариков и автоматически применяется, после игрок переходит автоматом на след клетку.'
+          : 'Убрать окно выбора условий для старта и финиша.';
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm">
+      <div className="pointer-events-auto w-full max-w-[760px] rounded-[1.8rem] border border-cyan-400/30 bg-zinc-950/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+        <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Информация о клетке</p>
+        <h4 className="mt-2 text-3xl font-black text-white">{heading}</h4>
+        <p className="mt-3 text-sm text-zinc-300">{description}</p>
+        {type === 'LOTTERY' ? (
+          <button type="button" onClick={() => setLotteryRoll(Math.floor(Math.random() * 31) + 1)} className="mt-4 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">
+            Выпадение числа 1–31
+          </button>
+        ) : null}
+        {lotteryRoll ? <p className="mt-2 text-sm text-emerald-100">Выпало число: <b>{lotteryRoll}</b>. Выбери соответствующий пресет на GameGauntlets.</p> : null}
+        {type === 'CHAOS_WHEEL' ? (
+          <>
+            <button type="button" onClick={() => setChaosResult(chaosWheelConditions[Math.floor(Math.random() * chaosWheelConditions.length)] ?? null)} className="mt-4 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-2 text-sm text-fuchsia-100">
+              Крутка подлянки / кайфарика
+            </button>
+            {chaosResult ? <p className="mt-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-100">{chaosResult}</p> : null}
+          </>
+        ) : null}
+        {type !== 'START' ? (
+          <div className="mt-5 grid gap-3">
+            <input value={gameTitle} onChange={(event) => { setGameTitle(event.target.value); setError(''); }} placeholder="Название назначенной игры" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+            <input value={gameUrl} onChange={(event) => setGameUrl(event.target.value)} placeholder="Ссылка на игру или на подборку" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+            <textarea value={playerComment} onChange={(event) => setPlayerComment(event.target.value)} placeholder="Комментарий игрока" className="min-h-24 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
+            {error ? <p className="text-sm text-red-300">{error}</p> : null}
+          </div>
+        ) : null}
+        <div className="mt-5 flex flex-wrap gap-3">
+          {type !== 'START' ? (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                if (!gameTitle.trim()) {
+                  setError('Нужно указать игру, иначе активный слот останется без понятной записи.');
+                  return;
+                }
+                onCreate({ gameTitle: gameTitle.trim(), gameUrl: gameUrl.trim(), playerComment: [playerComment.trim(), lotteryRoll ? `Лотерея: число ${lotteryRoll}` : null, chaosResult].filter(Boolean).join('\n') });
+              }}
+              className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-100 disabled:opacity-40"
+            >
+              {isPending ? 'Сохраняем...' : 'Сохранить игру'}
+            </button>
+          ) : null}
+          <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-700 px-5 py-3 text-sm text-zinc-200">Закрыть</button>
+        </div>
+        <p className="mt-4 text-xs text-zinc-500">Слот: {cell.slotNumber} — {cell.name}</p>
+      </div>
+    </div>
+  );
+}
+
 export function PerimeterBoard({ board, players, activePlayer, seasonName, currentPosition, hasActiveRun, activeRun, activeGameEffects, activeEffectsPreview, blockedReason, isAdmin, isInJail, initialRoll }: BoardProps) {
   const [selectedCell, setSelectedCell] = useState<BoardCellData | null>(null);
+  const [specialCell, setSpecialCell] = useState<{ cell: BoardCellData; type: SpecialLandingType } | null>(null);
+  const [achievementText, setAchievementText] = useState<string | null>(null);
   const [rollState, setRollState] = useState(initialRoll);
   const [runtimeBlockedReason, setRuntimeBlockedReason] = useState<string | null>(blockedReason);
   const [assignmentState, setAssignmentState] = useState<{ runId: string; slotName: string; conditionType: ConditionType } | null>(null);
@@ -405,8 +526,25 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     setRollState({ die1: payload.die1, die2: payload.die2, total: payload.total, finalMoveTotal: payload.finalMoveTotal, breakdown: payload.breakdown ?? [] });
     if (payload.landedSlot) {
       const nextCell = board.find((cell) => cell.id === payload.landedSlot.id);
-      if (nextCell) setSelectedCell(nextCell);
+      if (nextCell) {
+        const isSpecial = payload.skipConditionChoice || nextCell.type === 'START' || nextCell.type === 'AUCTION' || nextCell.type === 'LOTTERY' || questionSlots.has(nextCell.slotNumber) || chaosWheelSlots.has(nextCell.slotNumber);
+        if (isSpecial) {
+          const type: SpecialLandingType = nextCell.type === 'START'
+            ? 'START'
+            : nextCell.type === 'AUCTION'
+              ? 'AUCTION'
+              : nextCell.type === 'LOTTERY'
+                ? 'LOTTERY'
+                : chaosWheelSlots.has(nextCell.slotNumber)
+                  ? 'CHAOS_WHEEL'
+                  : 'QUESTION';
+          setSpecialCell({ cell: nextCell, type });
+        } else {
+          setSelectedCell(nextCell);
+        }
+      }
     }
+    if (payload.showStartFinishAchievement && payload.lapBonus) setAchievementText(`Если игрок проходит игровое поле целиком, получает ${payload.lapBonus} поинтов.`);
     if (payload.autoSkippedJail) {
       setRuntimeBlockedReason('Тюрьма была пройдена автоматически, потому что это не дроп и не тюремный статус.');
     }
@@ -449,6 +587,22 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     }
   });
 
+  const handleCreateSpecialRun = (payload: { gameTitle: string; gameUrl: string; playerComment: string }) => startTransition(async () => {
+    if (!specialCell) return;
+    const response = await fetch('/api/board/special-run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slotId: specialCell.cell.id, ...payload }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setRuntimeBlockedReason(result.error ?? 'Не удалось создать спец-ран.');
+      return;
+    }
+    setSpecialCell(null);
+    router.refresh();
+  });
+
   return (
     <div className="relative mx-auto w-full max-w-[1120px]">
       <div className="rounded-[2.35rem] border-[10px] border-zinc-800 bg-[linear-gradient(135deg,rgba(39,39,42,0.98),rgba(10,10,12,1))] p-3 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
@@ -485,9 +639,11 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
           </div>
 
           {selectedCell ? <SlotDetailWindow cell={selectedCell} onClose={() => setSelectedCell(null)} canAssign={Boolean((selectedCell.playable || (isInJail && selectedCell.type === 'JAIL')) && selectedCell.slotNumber === currentPosition && !hasActiveRun)} forcedCondition={forcedCondition} onAssign={handleAssign} isPending={isPending} isAdmin={isAdmin} onSave={handleSaveSlot} /> : null}
+          {specialCell ? <SpecialSlotModal cell={specialCell.cell} type={specialCell.type} isPending={isPending} onClose={() => setSpecialCell(null)} onCreate={handleCreateSpecialRun} /> : null}
           {assignmentState ? <ActiveGameModal runId={assignmentState.runId} slotName={assignmentState.slotName} conditionType={assignmentState.conditionType} onClose={() => setAssignmentState(null)} onConfirm={handleConfirmActiveGame} isPending={isPending} /> : null}
         </div>
       </div>
+      {achievementText ? <AchievementToast text={achievementText} /> : null}
 
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
         <div className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-4">

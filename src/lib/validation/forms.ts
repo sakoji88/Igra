@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { normalizeStringList } from '@/lib/server/items';
 
 export const loginSchema = z.object({
-  nickname: z.string().min(3).max(32),
-  password: z.string().min(6),
+  nickname: z.string().trim().min(3, 'Никнейм должен быть минимум 3 символа.').max(32, 'Никнейм не должен быть длиннее 32 символов.'),
+  password: z.string().min(6, 'Пароль должен быть минимум 6 символов.'),
 });
 
 export const registerSchema = z.object({
-  nickname: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_а-яА-Я-]+$/u, 'Только буквы, цифры, _, -'),
-  password: z.string().min(6),
-  avatarUrl: z.string().url().optional().or(z.literal('')),
+  nickname: z.string().trim().min(3, 'Никнейм должен быть минимум 3 символа.').max(32, 'Никнейм не должен быть длиннее 32 символов.').regex(/^[a-zA-Z0-9_а-яА-Я-]+$/u, 'Только буквы, цифры, _, -'),
+  password: z.string().min(6, 'Пароль должен быть минимум 6 символов.'),
+  avatarUrl: z.string().url('Ссылка на аватар должна быть корректным URL.').optional().or(z.literal('')),
 });
 
 export const runUpdateSchema = z.object({
