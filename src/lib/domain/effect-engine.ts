@@ -253,6 +253,22 @@ export function resolveActiveGameEffects(items: InventoryRuntimeItem[]) {
     }));
 }
 
+export function resolveActiveGameConsumptions(items: InventoryRuntimeItem[]) {
+  const consumedItemIds = new Set<string>();
+
+  for (const runtimeItem of items) {
+    const config = getItemConfig(runtimeItem);
+    if (!config) continue;
+    for (const effect of getMatchingEffects(runtimeItem, 'while_game_active')) {
+      if (effect.oneTime || effect.consumption === 'manual') {
+        consumedItemIds.add(runtimeItem.inventoryItemId);
+      }
+    }
+  }
+
+  return [...consumedItemIds];
+}
+
 export function resolveScoreEffects(params: { items: InventoryRuntimeItem[]; baseScore: number; lastDie1?: number | null; lastDie2?: number | null; passedStart?: boolean }) {
   const breakdown: EffectBreakdownEntry[] = [];
   const consumedItemIds = new Set<string>();

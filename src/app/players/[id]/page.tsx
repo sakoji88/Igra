@@ -15,14 +15,13 @@ import { resolveActiveGameEffects, resolveDropEffects, resolveScoreEffects } fro
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireSession();
   const { id } = await params;
-  if (session.user.id !== id && session.user.role !== 'ADMIN' && session.user.role !== 'JUDGE') redirect('/');
 
   const [user, players] = await Promise.all([getProfileByUserId(id), getPlayersList()]);
   if (!user) notFound();
   const playerNickname = user.nickname;
   const state = user.seasonStates[0];
   const activeRun = user.runs.find((run) => run.status === 'ACTIVE') ?? null;
-  const completedWithoutGift = user.runs.filter((run) => run.status === 'COMPLETED' && !run.wheelSpinsGrantedAt);
+  const completedWithoutGift = user.runs.filter((run) => run.status === 'COMPLETED' && !run.wheelSpinsGrantedAt && run.slotName !== 'Тюрьма');
   const runtimeItems = state ? mapInventoryItemsForEffects(state.inventoryItems.map((item) => ({ id: item.id, chargesCurrent: item.chargesCurrent, itemDefinition: { id: item.itemDefinition.id, number: item.itemDefinition.number, name: item.itemDefinition.name, type: item.itemDefinition.type } }))) : [];
   const activeGameEffects = resolveActiveGameEffects(runtimeItems);
 
@@ -39,6 +38,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   async function completeRunAction(formData: FormData) {
     'use server';
+    const session = await requireSession();
+    if (session.user.id !== id && session.user.role !== 'ADMIN' && session.user.role !== 'JUDGE') redirect('/');
     const season = await getCurrentSeason();
     const runId = String(formData.get('runId'));
     const run = await prisma.runAssignment.findUnique({ where: { id: runId } });
@@ -56,15 +57,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       passedStart: false,
     });
     await prisma.runAssignment.update({ where: { id: runId }, data: { status: 'COMPLETED', completedAt: new Date() } });
+    const scoreIncrement = run.slotName === 'Тюрьма' ? 0 : scoreEffects.finalScore;
     await prisma.playerSeasonState.update({
       where: { userId_seasonId: { userId: run.userId, seasonId: season.id } },
       data: {
-        score: { increment: scoreEffects.finalScore },
+        score: scoreIncrement > 0 ? { increment: scoreIncrement } : undefined,
         ...(run.slotName === 'Тюрьма' ? { jailReason: null } : {}),
       },
     });
     await consumeInventoryItems(scoreEffects.consumedItemIds);
-    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} завершил игру «${run.gameTitle ?? run.slotName}» и получил ${scoreEffects.finalScore} очков.${run.slotName === 'Тюрьма' ? ' Тюремный статус снят.' : ''}`, payload: { runId, baseScore: run.expectedPoints, scoreEffects: scoreEffects.breakdown, finalScore: scoreEffects.finalScore, clearedJail: run.slotName === 'Тюрьма' } } });
+    await prisma.eventLog.create({ data: { seasonId: season.id, userId: run.userId, type: 'RUN', summary: `${playerNickname} завершил игру «${run.gameTitle ?? run.slotName}» и получил ${scoreIncrement} очков.${run.slotName === 'Тюрьма' ? ' Тюремный статус снят.' : ''}`, payload: { runId, baseScore: run.expectedPoints, scoreEffects: scoreEffects.breakdown, finalScore: scoreIncrement, clearedJail: run.slotName === 'Тюрьма' } } });
     revalidatePath(`/players/${id}`);
     revalidatePath('/board');
   }
@@ -88,6 +90,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   async function dropRunAction(formData: FormData) {
     'use server';
+    const session = await requireSession();
+    if (session.user.id !== id && session.user.role !== 'ADMIN' && session.user.role !== 'JUDGE') redirect('/');
     const season = await getCurrentSeason();
     const runId = String(formData.get('runId'));
     const run = await prisma.runAssignment.findUnique({ where: { id: runId } });

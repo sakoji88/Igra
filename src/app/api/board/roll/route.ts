@@ -8,6 +8,21 @@ import { getCurrentSeason } from '@/lib/server/auth';
 import { CHAOS_WHEEL_SLOT_NUMBERS, QUESTION_SLOT_NUMBERS, isPlayableSlot } from '@/lib/server/board';
 import { consumeInventoryItems, mapInventoryItemsForEffects } from '@/lib/server/items';
 
+const chaosWheelConditions = [
+  'Получите +1 к итоговому значению следующего броска.',
+  'Получите -1 к итоговому значению следующего броска.',
+  'Получите +2 к итоговому значению следующего броска.',
+  'Получите -2 к итоговому значению следующего броска.',
+  'Переместитесь на клетку "Аукциона" и пройдите там игру.',
+  'Переместитесь на клетку "Лотерея" и пройдите там игру.',
+  'Переместитесь на клетку "Фул рандом" с противоположной от вас стороны и пройдите там игру.',
+  'Получите 1 поинт.',
+  'Потеряйте 1 поинт.',
+  'Верхний порог времени следующей клетки ниже на 2 часа.',
+  'Текущее преодоление всего игрового поля дает лишь 2 поинта, вместо 5.',
+  'Вернитесь на клетку, с которой вы начинали текущий ход и совершите ход заново, сохранив эффекты событий и предметов, влияющих на движение.',
+] as const;
+
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -19,6 +34,8 @@ export async function POST() {
   });
 
   if (!state) return NextResponse.json({ error: 'State not found' }, { status: 404 });
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id }, select: { nickname: true } });
+  const actorName = actor?.nickname ?? 'Игрок';
 
   if (state.jailReason) {
     return NextResponse.json({ error: 'Игрок сейчас в тюрьме после дропа. Сначала закрой тюремный слот или попроси судью/админа скорректировать состояние.' }, { status: 400 });
@@ -62,11 +79,44 @@ export async function POST() {
   let slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: moved.nextPosition } } });
   let finalPosition = moved.nextPosition;
   let autoSkippedJail = false;
+  let chaosResult: string | null = null;
+  let chaosAutoApplied = false;
+  let chaosNeedsManualFollowup = false;
   const lapBonus = moved.passedStart ? 5 : 0;
   if (slot?.type === 'JAIL' && !state.jailReason) {
     autoSkippedJail = true;
     finalPosition = (moved.nextPosition + 1) % boardSize;
     slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
+  }
+  let scoreDeltaFromChaos = 0;
+  if (slot && (CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber) || slot.slotNumber === 8)) {
+    chaosResult = chaosWheelConditions[Math.floor(Math.random() * chaosWheelConditions.length)] ?? chaosWheelConditions[0];
+    if (chaosResult === chaosWheelConditions[4]) {
+      finalPosition = 20;
+      slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[5]) {
+      finalPosition = 30;
+      slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[6]) {
+      finalPosition = (state.boardPosition + 20) % boardSize;
+      slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[7]) {
+      scoreDeltaFromChaos = 1;
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[8]) {
+      scoreDeltaFromChaos = -1;
+      chaosAutoApplied = true;
+    } else {
+      chaosNeedsManualFollowup = true;
+    }
+
+    if (scoreDeltaFromChaos === 0 && chaosAutoApplied) {
+      finalPosition = (finalPosition + 1) % boardSize;
+      slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
+    }
   }
 
   const updated = await prisma.playerSeasonState.update({
@@ -74,7 +124,14 @@ export async function POST() {
     data: {
       previousBoardPosition: state.boardPosition,
       boardPosition: finalPosition,
-      score: lapBonus ? { increment: lapBonus } : undefined,
+      score: (lapBonus || scoreDeltaFromChaos)
+        ? (() => {
+          const totalDelta = lapBonus + scoreDeltaFromChaos;
+          if (totalDelta > 0) return { increment: totalDelta };
+          if (totalDelta < 0) return { decrement: Math.abs(totalDelta) };
+          return undefined;
+        })()
+        : undefined,
       lastDie1: effectResolution.die1,
       lastDie2: effectResolution.die2,
       lastRollTotal: effectResolution.finalMoveTotal,
@@ -88,7 +145,7 @@ export async function POST() {
       seasonId: season.id,
       userId: session.user.id,
       type: 'TURN',
-      summary: `${session.user.name} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${finalPosition}${slot ? ` — ${slot.name}` : ''}${autoSkippedJail ? ' (тюрьма пропущена автоматически)' : ''}${lapBonus ? ` и получил ${lapBonus} поинтов за прохождение круга` : ''}.`,
+      summary: `${actorName} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${finalPosition}${slot ? ` — ${slot.name}` : ''}${autoSkippedJail ? ' (тюрьма пропущена автоматически)' : ''}${lapBonus ? ` и получил ${lapBonus} поинтов за прохождение круга` : ''}.`,
       payload: {
         kind: 'ROLL_RESULT',
         from: state.boardPosition,
@@ -101,6 +158,9 @@ export async function POST() {
         finalMoveTotal: effectResolution.finalMoveTotal,
         movedBackwards: effectResolution.movedBackwards,
         breakdown: [...rollMode.breakdown, ...effectResolution.breakdown],
+        chaosResult,
+        chaosAutoApplied,
+        chaosNeedsManualFollowup,
       },
     },
   });
@@ -117,7 +177,10 @@ export async function POST() {
     lapBonus,
     showStartFinishAchievement: Boolean(lapBonus),
     autoSkippedJail,
-    skipConditionChoice: Boolean(slot && (slot.type === 'START' || slot.type === 'AUCTION' || slot.type === 'LOTTERY' || QUESTION_SLOT_NUMBERS.has(slot.slotNumber) || CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber))),
+    chaosResult,
+    chaosAutoApplied,
+    chaosNeedsManualFollowup,
+    skipConditionChoice: Boolean(slot && (slot.type === 'START' || slot.type === 'AUCTION' || slot.type === 'LOTTERY' || slot.type === 'JAIL' || QUESTION_SLOT_NUMBERS.has(slot.slotNumber) || CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber) || slot.slotNumber === 8)),
     landedSlot: slot ? {
       id: slot.id,
       slotNumber: slot.slotNumber,

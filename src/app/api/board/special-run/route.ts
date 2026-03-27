@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     prisma.boardSlot.findUnique({ where: { id: slotId } }),
     prisma.playerSeasonState.findUnique({ where: { userId_seasonId: { userId: session.user.id, seasonId: season.id } } }),
   ]);
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id }, select: { nickname: true } });
 
   if (!slot || slot.seasonId !== season.id) return NextResponse.json({ error: 'Слот не найден.' }, { status: 404 });
   if (!state || state.boardPosition !== slot.slotNumber) {
@@ -36,12 +37,13 @@ export async function POST(request: NextRequest) {
   const isAuction = slot.type === 'AUCTION' && slot.slotNumber === 20;
   const isLottery = slot.type === 'LOTTERY';
   const isQuestion = isQuestionSlot(slot.slotNumber);
+  const isJail = slot.type === 'JAIL';
 
-  if (!isAuction && !isLottery && !isQuestion && !isChaosWheelSlot(slot.slotNumber)) {
+  if (!isAuction && !isLottery && !isQuestion && !isChaosWheelSlot(slot.slotNumber) && !isJail) {
     return NextResponse.json({ error: 'Этот слот не использует спец-ран.' }, { status: 400 });
   }
 
-  const expectedPoints = isAuction || isLottery ? 3 : getSideBasePoints(slot.side);
+  const expectedPoints = isJail ? 0 : (isAuction || isLottery ? 3 : getSideBasePoints(slot.side));
   const run = await prisma.runAssignment.create({
     data: {
       userId: session.user.id,
@@ -63,8 +65,8 @@ export async function POST(request: NextRequest) {
       seasonId: season.id,
       userId: session.user.id,
       type: 'RUN',
-      summary: `${session.user.name} создал спец-ран на слоте ${slot.slotNumber}: ${slot.name}.`,
-      payload: { runId: run.id, slotId: slot.id, expectedPoints, type: isAuction ? 'AUCTION' : isLottery ? 'LOTTERY' : isQuestion ? 'QUESTION' : 'CHAOS_WHEEL' },
+      summary: `${actor?.nickname ?? 'Игрок'} создал спец-ран на слоте ${slot.slotNumber}: ${slot.name}.`,
+      payload: { runId: run.id, slotId: slot.id, expectedPoints, type: isJail ? 'JAIL' : isAuction ? 'AUCTION' : isLottery ? 'LOTTERY' : isQuestion ? 'QUESTION' : 'CHAOS_WHEEL' },
     },
   });
 

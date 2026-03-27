@@ -29,6 +29,10 @@ export async function POST(request: NextRequest) {
 
   const targetState = await prisma.playerSeasonState.findUnique({ where: { userId_seasonId: { userId: targetUserId, seasonId: spin.seasonId } } });
   if (!targetState) return NextResponse.json({ error: 'Цель не найдена в текущем сезоне.' }, { status: 404 });
+  const [ownerUser, targetUser] = await Promise.all([
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { nickname: true } }),
+    prisma.user.findUnique({ where: { id: targetUserId }, select: { nickname: true } }),
+  ]);
 
   const ownerTrap = await prisma.playerInventoryItem.findFirst({
     where: {
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
       seasonId: spin.seasonId,
       userId: session.user.id,
       type: 'ITEM',
-      summary: `${session.user.name} кинул ловушку «${ownerTrap.itemDefinition.name}» игроку ${targetUserId}.`,
+      summary: `${ownerUser?.nickname ?? 'Игрок'} кинул ловушку «${ownerTrap.itemDefinition.name}» игроку ${targetUser?.nickname ?? targetUserId}.`,
       payload: { spinId: spin.id, targetUserId, outcome: outcome.outcome },
     },
   });

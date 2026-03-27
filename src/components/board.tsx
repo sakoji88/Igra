@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 type BoardSlotSide = 'bottom' | 'left' | 'top' | 'right';
 type BoardSlotType = 'START' | 'REGULAR' | 'RANDOM' | 'JAIL' | 'LOTTERY' | 'AUCTION' | 'PODLYANKA' | 'KAIFARIK' | 'WHEEL';
 type ConditionType = 'BASE' | 'GENRE';
-type SpecialLandingType = 'AUCTION' | 'LOTTERY' | 'QUESTION' | 'CHAOS_WHEEL' | 'START';
+type SpecialLandingType = 'AUCTION' | 'LOTTERY' | 'QUESTION' | 'CHAOS_WHEEL' | 'START' | 'JAIL';
 
 type BoardCellData = {
   id: string;
@@ -435,6 +435,8 @@ function SpecialSlotModal({
         ? 'Клетка вопросика'
         : type === 'CHAOS_WHEEL'
           ? 'Подлянка / Кайфарик'
+          : type === 'JAIL'
+            ? 'Тюрьма'
           : 'Старт x Финиш';
 
   const description = type === 'AUCTION'
@@ -445,6 +447,8 @@ function SpecialSlotModal({
         ? 'Добавить клетки вопросиков (5,15,25,35 клетки) высвечивается окно для ввода игры, эти клетки обозначают, что игрок роллит игру на сайте https://gamegauntlets.com без каких либо особенностей.'
         : type === 'CHAOS_WHEEL'
           ? 'Нет слотов подлянок и кайфариков (2, 12, 22, 32 слот) суть слотов в крутке из 12 условий, из бафов и дебафов, когда игрок попадает на слот, высвечивается окно с описание слота, и кнопкой крутки, выпадает одна из 12 подлянок или кайфариков и автоматически применяется, после игрок переходит автоматом на след клетку.'
+          : type === 'JAIL'
+            ? 'оформить клетку с тюрьмой чтобы не было выбора условий, когда игрок попадает в тюрьму после дропа игры, и он открывает поле, то сразу появляется окно с особенным тюремным, с условиями для ролла тюремной игры.'
           : 'Убрать окно выбора условий для старта и финиша.';
 
   return (
@@ -453,6 +457,9 @@ function SpecialSlotModal({
         <p className="text-xs uppercase tracking-[0.32em] text-cyan-300">Информация о клетке</p>
         <h4 className="mt-2 text-3xl font-black text-white">{heading}</h4>
         <p className="mt-3 text-sm text-zinc-300">{description}</p>
+        {type === 'JAIL' ? (
+          <a href="https://gamegauntlets.com/#wheel" target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-full border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-sm text-orange-100">Открыть тюремный ролл</a>
+        ) : null}
         {type === 'LOTTERY' ? (
           <button type="button" onClick={() => setLotteryRoll(Math.floor(Math.random() * 31) + 1)} className="mt-4 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">
             Выпадение числа 1–31
@@ -515,6 +522,27 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     return preview ? 'BASE' : null;
   }, [activeEffectsPreview]);
 
+  const resolveSpecialType = (cell: BoardCellData): SpecialLandingType | null => {
+    if (cell.type === 'START') return 'START';
+    if (cell.type === 'AUCTION') return 'AUCTION';
+    if (cell.type === 'LOTTERY') return 'LOTTERY';
+    if (cell.type === 'JAIL' && isInJail) return 'JAIL';
+    if (chaosWheelSlots.has(cell.slotNumber) || cell.slotNumber === 8) return 'CHAOS_WHEEL';
+    if (questionSlots.has(cell.slotNumber)) return 'QUESTION';
+    return null;
+  };
+
+  const openCellWindow = (cell: BoardCellData) => {
+    const specialType = resolveSpecialType(cell);
+    if (specialType) {
+      setSpecialCell({ cell, type: specialType });
+      setSelectedCell(null);
+      return;
+    }
+    setSpecialCell(null);
+    setSelectedCell(cell);
+  };
+
   const handleRoll = () => startTransition(async () => {
     const response = await fetch('/api/board/roll', { method: 'POST' });
     const payload = await response.json();
@@ -529,15 +557,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
       if (nextCell) {
         const isSpecial = payload.skipConditionChoice || nextCell.type === 'START' || nextCell.type === 'AUCTION' || nextCell.type === 'LOTTERY' || questionSlots.has(nextCell.slotNumber) || chaosWheelSlots.has(nextCell.slotNumber);
         if (isSpecial) {
-          const type: SpecialLandingType = nextCell.type === 'START'
-            ? 'START'
-            : nextCell.type === 'AUCTION'
-              ? 'AUCTION'
-              : nextCell.type === 'LOTTERY'
-                ? 'LOTTERY'
-                : chaosWheelSlots.has(nextCell.slotNumber)
-                  ? 'CHAOS_WHEEL'
-                  : 'QUESTION';
+          const type = resolveSpecialType(nextCell) ?? 'QUESTION';
           setSpecialCell({ cell: nextCell, type });
         } else {
           setSelectedCell(nextCell);
@@ -603,6 +623,12 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     router.refresh();
   });
 
+  useEffect(() => {
+    if (!isInJail || hasActiveRun || specialCell) return;
+    const jailCell = board.find((cell) => cell.slotNumber === currentPosition && cell.type === 'JAIL');
+    if (jailCell) setSpecialCell({ cell: jailCell, type: 'JAIL' });
+  }, [board, currentPosition, hasActiveRun, isInJail, specialCell]);
+
   return (
     <div className="relative mx-auto w-full max-w-[1120px]">
       <div className="rounded-[2.35rem] border-[10px] border-zinc-800 bg-[linear-gradient(135deg,rgba(39,39,42,0.98),rgba(10,10,12,1))] p-3 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
@@ -612,7 +638,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
             {board.map((cell) => {
               const meta = getCellMeta(cell.slotNumber);
               const playersOnCell = players.filter((player) => player.boardPosition === cell.slotNumber);
-              return <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }} className="bg-zinc-950"><BoardTile cell={cell} meta={meta} playersOnCell={playersOnCell} onSelect={setSelectedCell} /></div>;
+              return <div key={cell.id} style={{ gridColumn: meta.gridColumn, gridRow: meta.gridRow }} className="bg-zinc-950"><BoardTile cell={cell} meta={meta} playersOnCell={playersOnCell} onSelect={openCellWindow} /></div>;
             })}
             <div className="col-[4_/_9] row-[4_/_9] flex items-center justify-center p-4">
               <div className="w-full max-w-[320px] rounded-[1.3rem] border border-zinc-700/70 bg-black/60 p-4 text-center shadow-[0_18px_35px_rgba(0,0,0,0.18)] backdrop-blur-sm">

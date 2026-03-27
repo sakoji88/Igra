@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { resolveActiveGameConsumptions } from '@/lib/domain/effect-engine';
+import { consumeInventoryItems, mapInventoryItemsForEffects } from '@/lib/server/items';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -18,6 +20,7 @@ export async function POST(request: NextRequest) {
   const run = await prisma.runAssignment.findUnique({ where: { id: runId } });
   if (!run || run.userId !== session.user.id) return NextResponse.json({ error: 'Активная игра не найдена.' }, { status: 404 });
   if (run.status !== 'ACTIVE') return NextResponse.json({ error: 'Эта запись уже не является активной игрой.' }, { status: 400 });
+  const actor = await prisma.user.findUnique({ where: { id: run.userId }, select: { nickname: true } });
 
   const updated = await prisma.runAssignment.update({
     where: { id: run.id },
@@ -28,12 +31,21 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  const state = await prisma.playerSeasonState.findUnique({
+    where: { userId_seasonId: { userId: run.userId, seasonId: run.seasonId } },
+    include: { inventoryItems: { include: { itemDefinition: true }, orderBy: { obtainedAt: 'asc' } } },
+  });
+  if (state) {
+    const consumedItems = resolveActiveGameConsumptions(mapInventoryItemsForEffects(state.inventoryItems));
+    await consumeInventoryItems(consumedItems);
+  }
+
   await prisma.eventLog.create({
     data: {
       seasonId: run.seasonId,
       userId: run.userId,
       type: 'RUN',
-      summary: `${session.user.name} зафиксировал активную игру «${gameTitle}».`,
+      summary: `${actor?.nickname ?? 'Игрок'} зафиксировал активную игру «${gameTitle}».`,
       payload: { runId: run.id, gameTitle, gameUrl: gameUrl || null },
     },
   });
