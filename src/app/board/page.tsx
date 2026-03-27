@@ -8,8 +8,12 @@ import { mapInventoryItemsForEffects } from '@/lib/server/items';
 
 export default async function BoardPage() {
   const session = await requireSession();
+  const sessionUserId = session.user.id;
+  if (!sessionUserId) {
+    throw new Error('Session user id is required for board page');
+  }
   const { season, slots, states, logs } = await getBoardViewData();
-  const current = await getCurrentUserState(session.user.id!);
+  const current = await getCurrentUserState(sessionUserId);
   if (!current) {
     return (
       <AppLayout>
@@ -43,10 +47,20 @@ export default async function BoardPage() {
     displayName: state.user.profile?.displayName ?? state.user.nickname,
     avatarUrl: state.user.avatarUrl ?? `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(state.user.nickname)}`,
     boardPosition: state.boardPosition,
-    isActivePlayer: state.user.id === session.user.id,
+    isActivePlayer: state.user.id === sessionUserId,
   }));
 
   const activeRun = current.user.runs.find((run) => run.status === 'ACTIVE') ?? null;
+
+  const currentDisplayName = current.user.profile?.displayName ?? current.user.nickname;
+  const currentAvatar = current.user.avatarUrl ?? `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(current.user.nickname)}`;
+  const boardActivePlayer = players.find((player) => player.id === sessionUserId) ?? {
+    id: sessionUserId,
+    displayName: currentDisplayName,
+    avatarUrl: currentAvatar,
+    boardPosition: current.boardPosition,
+    isActivePlayer: true,
+  };
   const runtimeItems = mapInventoryItemsForEffects(current.inventoryItems.map((item) => ({
     id: item.id,
     chargesCurrent: item.chargesCurrent,
@@ -67,7 +81,7 @@ export default async function BoardPage() {
           <PerimeterBoard
             board={board}
             players={players}
-            activePlayer={players.find((player) => player.id === session.user.id)!}
+            activePlayer={boardActivePlayer}
             seasonName={season.name}
             currentPosition={current.boardPosition}
             hasActiveRun={Boolean(activeRun)}
