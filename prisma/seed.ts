@@ -48,7 +48,7 @@ async function main() {
   });
 
   const adminState = await prisma.playerSeasonState.create({
-    data: { seasonId: season.id, userId: admin.id, boardPosition: 0, score: 0, availableWheelSpins: 3 },
+    data: { seasonId: season.id, userId: admin.id, boardPosition: 0, score: 0, availableWheelSpins: 0 },
   });
 
   await prisma.boardSlot.createMany({ data: createBoardSlotSeed(season.id) });

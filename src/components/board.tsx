@@ -195,7 +195,7 @@ function SlotArtwork({ cell, isCorner }: { cell: BoardCellData; isCorner: boolea
           className={cn('max-h-[76%] max-w-[76%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]', isCorner ? 'scale-110' : 'scale-100')}
         />
       ) : (
-        <span className={cn('leading-none drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]', isCorner ? 'text-5xl' : 'text-[2.3rem]')}>{cell.imageFallback}</span>
+        <span className="text-xs text-zinc-500">—</span>
       )}
     </div>
   );
@@ -403,9 +403,12 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     }
     setRuntimeBlockedReason(null);
     setRollState({ die1: payload.die1, die2: payload.die2, total: payload.total, finalMoveTotal: payload.finalMoveTotal, breakdown: payload.breakdown ?? [] });
-    if (payload.landedSlot?.playable) {
+    if (payload.landedSlot) {
       const nextCell = board.find((cell) => cell.id === payload.landedSlot.id);
       if (nextCell) setSelectedCell(nextCell);
+    }
+    if (payload.autoSkippedJail) {
+      setRuntimeBlockedReason('Тюрьма была пройдена автоматически, потому что это не дроп и не тюремный статус.');
     }
     router.refresh();
   });

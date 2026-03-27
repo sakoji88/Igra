@@ -10,26 +10,30 @@ import { getCurrentSeason } from '@/lib/server/auth';
 import { getDefaultAvatar } from '@/lib/avatar';
 import { registerSchema } from '@/lib/validation/forms';
 
-export default async function RegisterPage() {
+export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await auth();
   if (session?.user) redirect('/');
+  const params = await searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center px-4">
       <Card className="w-full">
         <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">Регистрация</p>
         <h1 className="mt-2 text-3xl font-black">Создать игрока</h1>
+        {params.error ? <p className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{params.error}</p> : null}
         <form
           action={async (formData) => {
             'use server';
-            const parsed = registerSchema.parse({
+            const parsedResult = registerSchema.safeParse({
               nickname: formData.get('nickname'),
               password: formData.get('password'),
               avatarUrl: formData.get('avatarUrl'),
             });
+            if (!parsedResult.success) redirect(`/register?error=${encodeURIComponent(parsedResult.error.issues[0]?.message ?? 'Проверь данные формы.')}`);
+            const parsed = parsedResult.data;
 
             const exists = await prisma.user.findUnique({ where: { nickname: parsed.nickname } });
-            if (exists) throw new Error('Такой ник уже существует.');
+            if (exists) redirect('/register?error=Такой%20ник%20уже%20существует');
 
             const season = await getCurrentSeason();
             const passwordHash = await bcrypt.hash(parsed.password, 10);
@@ -50,7 +54,7 @@ export default async function RegisterPage() {
                     seasonId: season.id,
                     boardPosition: 0,
                     score: 0,
-                    availableWheelSpins: 3,
+                    availableWheelSpins: 0,
                   },
                 },
               },

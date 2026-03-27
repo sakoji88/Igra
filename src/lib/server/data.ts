@@ -16,7 +16,7 @@ export async function ensurePlayerSeasonState(userId: string) {
       seasonId: season.id,
       boardPosition: 0,
       score: 0,
-      availableWheelSpins: 3,
+      availableWheelSpins: 0,
     },
   });
 }
@@ -91,7 +91,7 @@ export async function getBoardViewData() {
   const season = await getCurrentSeason();
   const [slots, states, logs] = await Promise.all([
     prisma.boardSlot.findMany({ where: { seasonId: season.id, isPublished: true }, orderBy: { slotNumber: 'asc' } }),
-    prisma.playerSeasonState.findMany({ where: { seasonId: season.id }, include: { user: { include: { profile: true } } } }),
+    prisma.playerSeasonState.findMany({ where: { seasonId: season.id, user: { role: 'PLAYER' } }, include: { user: { include: { profile: true } } } }),
     prisma.eventLog.findMany({ where: { seasonId: season.id }, orderBy: { createdAt: 'desc' }, take: 12 }),
   ]);
 
@@ -168,7 +168,7 @@ export async function getItemsCatalog() {
 
 export async function getWheelPageData(userId: string) {
   const season = await getCurrentSeason();
-  const [state, wheel, logs] = await Promise.all([
+  const [state, wheel, logs, players] = await Promise.all([
     ensurePlayerSeasonState(userId).then(() => prisma.playerSeasonState.findUnique({
       where: { userId_seasonId: { userId, seasonId: season.id } },
       include: {
@@ -178,9 +178,10 @@ export async function getWheelPageData(userId: string) {
     })),
     ensureActiveWheelDefinition(),
     prisma.eventLog.findMany({ where: { seasonId: season.id, type: 'WHEEL', userId }, orderBy: { createdAt: 'desc' }, take: 8 }),
+    prisma.playerSeasonState.findMany({ where: { seasonId: season.id, user: { role: 'PLAYER' } }, include: { user: { include: { profile: true } } }, orderBy: { score: 'desc' } }),
   ]);
 
-  return { season, state, wheel, logs };
+  return { season, state, wheel, logs, players };
 }
 
 export function getPotentialPoints(side: 'BOTTOM' | 'LEFT' | 'TOP' | 'RIGHT', conditionType: 'BASE' | 'GENRE') {

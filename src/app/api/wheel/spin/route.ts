@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
         imageUrl: result.entry.imageUrl,
         rewardSpins: result.entry.rewardSpins,
         itemName: result.entry.itemDefinition?.name ?? null,
+        itemType: result.entry.itemDefinition?.type ?? null,
+        itemNumber: result.entry.itemDefinition?.number ?? null,
       },
       inventoryOutcome: result.inventoryOutcome,
     });

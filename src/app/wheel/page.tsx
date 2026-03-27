@@ -6,7 +6,7 @@ import { getWheelPageData } from '@/lib/server/data';
 
 export default async function WheelPage() {
   const session = await requireSession();
-  const { season, state, wheel, logs } = await getWheelPageData(session.user.id!);
+  const { season, state, wheel, logs, players } = await getWheelPageData(session.user.id!);
 
   return (
     <AppLayout>
@@ -23,6 +23,7 @@ export default async function WheelPage() {
         </section>
         <WheelSpinner
           availableSpins={state?.availableWheelSpins ?? 0}
+          targets={(players ?? []).filter((p) => p.userId !== session.user.id).map((p) => ({ id: p.userId, name: p.user.profile?.displayName ?? p.user.nickname }))}
           history={(state?.wheelSpins ?? []).map((spin) => ({ id: spin.id, createdAt: spin.createdAt.toISOString(), label: spin.wheelEntry.label, itemName: spin.wheelEntry.itemDefinition?.name ?? null }))}
         />
         <section className="rounded-3xl border border-zinc-800 bg-zinc-950/90 p-6">

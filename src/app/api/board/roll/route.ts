@@ -59,13 +59,20 @@ export async function POST() {
   const boardSize = await prisma.boardSlot.count({ where: { seasonId: season.id } });
   const movementValue = effectResolution.movedBackwards ? (boardSize - (effectResolution.finalMoveTotal % boardSize || boardSize)) : effectResolution.finalMoveTotal;
   const moved = moveOnBoard(state.boardPosition, movementValue, boardSize);
-  const slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: moved.nextPosition } } });
+  let slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: moved.nextPosition } } });
+  let finalPosition = moved.nextPosition;
+  let autoSkippedJail = false;
+  if (slot?.type === 'JAIL' && !state.jailReason) {
+    autoSkippedJail = true;
+    finalPosition = (moved.nextPosition + 1) % boardSize;
+    slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
+  }
 
   const updated = await prisma.playerSeasonState.update({
     where: { id: state.id },
     data: {
       previousBoardPosition: state.boardPosition,
-      boardPosition: moved.nextPosition,
+      boardPosition: finalPosition,
       lastDie1: effectResolution.die1,
       lastDie2: effectResolution.die2,
       lastRollTotal: effectResolution.finalMoveTotal,
@@ -79,11 +86,11 @@ export async function POST() {
       seasonId: season.id,
       userId: session.user.id,
       type: 'TURN',
-      summary: `${session.user.name} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${moved.nextPosition}${slot ? ` — ${slot.name}` : ''}.`,
+      summary: `${session.user.name} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${finalPosition}${slot ? ` — ${slot.name}` : ''}${autoSkippedJail ? ' (тюрьма пропущена автоматически).' : '.'}`,
       payload: {
         kind: 'ROLL_RESULT',
         from: state.boardPosition,
-        to: moved.nextPosition,
+        to: finalPosition,
         passedStart: moved.passedStart,
         die1: effectResolution.die1,
         die2: effectResolution.die2,
@@ -105,6 +112,7 @@ export async function POST() {
     movedBackwards: effectResolution.movedBackwards,
     breakdown: [...rollMode.breakdown, ...effectResolution.breakdown],
     state: updated,
+    autoSkippedJail,
     landedSlot: slot ? {
       id: slot.id,
       slotNumber: slot.slotNumber,
