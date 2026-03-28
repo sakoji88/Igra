@@ -24,6 +24,11 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
         <form
           action={async (formData) => {
             'use server';
+            const invitePassword = String(formData.get('invitePassword') ?? '');
+            const requiredInvitePassword = process.env.REGISTER_INVITE_PASSWORD?.trim();
+            if (requiredInvitePassword && invitePassword !== requiredInvitePassword) {
+              redirect('/register?error=Неверный%20пароль%20доступа%20к%20регистрации');
+            }
             const parsedResult = registerSchema.safeParse({
               nickname: formData.get('nickname'),
               password: formData.get('password'),
@@ -77,6 +82,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
           }}
           className="mt-6 grid gap-4"
         >
+          <input name="invitePassword" type="password" required placeholder="Пароль доступа к регистрации" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
           <input name="nickname" type="text" required minLength={3} maxLength={32} pattern="^[a-zA-Z0-9_а-яА-Я-]+$" placeholder="Никнейм" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
           <input name="password" type="password" required minLength={6} placeholder="Пароль" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
           <input name="avatarUrl" type="url" placeholder="Avatar URL (необязательно)" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
