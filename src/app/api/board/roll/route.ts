@@ -89,7 +89,7 @@ export async function POST() {
     slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
   }
   let scoreDeltaFromChaos = 0;
-  if (slot && (CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber) || slot.slotNumber === 8)) {
+  if (slot && CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber)) {
     chaosResult = chaosWheelConditions[Math.floor(Math.random() * chaosWheelConditions.length)] ?? chaosWheelConditions[0];
     if (chaosResult === chaosWheelConditions[4]) {
       finalPosition = 20;
@@ -180,7 +180,7 @@ export async function POST() {
     chaosResult,
     chaosAutoApplied,
     chaosNeedsManualFollowup,
-    skipConditionChoice: Boolean(slot && (slot.type === 'START' || slot.type === 'AUCTION' || slot.type === 'LOTTERY' || slot.type === 'JAIL' || QUESTION_SLOT_NUMBERS.has(slot.slotNumber) || CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber) || slot.slotNumber === 8)),
+    skipConditionChoice: Boolean(slot && (slot.type === 'START' || slot.type === 'AUCTION' || slot.type === 'LOTTERY' || slot.type === 'JAIL' || QUESTION_SLOT_NUMBERS.has(slot.slotNumber) || CHAOS_WHEEL_SLOT_NUMBERS.has(slot.slotNumber))),
     landedSlot: slot ? {
       id: slot.id,
       slotNumber: slot.slotNumber,

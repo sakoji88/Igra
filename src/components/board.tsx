@@ -527,7 +527,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     if (cell.type === 'AUCTION') return 'AUCTION';
     if (cell.type === 'LOTTERY') return 'LOTTERY';
     if (cell.type === 'JAIL' && isInJail) return 'JAIL';
-    if (chaosWheelSlots.has(cell.slotNumber) || cell.slotNumber === 8) return 'CHAOS_WHEEL';
+    if (chaosWheelSlots.has(cell.slotNumber)) return 'CHAOS_WHEEL';
     if (questionSlots.has(cell.slotNumber)) return 'QUESTION';
     return null;
   };

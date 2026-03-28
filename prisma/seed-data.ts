@@ -48,7 +48,7 @@ export const boardCells = [
   ['Клетка вопросика', 'RANDOM'],
   ['Случайный ран', 'RANDOM'],
   ['Хоррор-сектор', 'REGULAR'],
-  ['Кайфарик', 'KAIFARIK'],
+  ['Обычный игровой слот', 'REGULAR'],
   ['JRPG-линия', 'REGULAR'],
   ['Тюрьма', 'JAIL'],
   ['Инди-подвал', 'REGULAR'],
