@@ -565,6 +565,9 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
       }
     }
     if (payload.showStartFinishAchievement && payload.lapBonus) setAchievementText(`Если игрок проходит игровое поле целиком, получает ${payload.lapBonus} поинтов.`);
+    if (payload.chaosResult) {
+      setRuntimeBlockedReason(payload.chaosAutoApplied ? `Подлянка/Кайфарик: ${payload.chaosResult}` : `Подлянка/Кайфарик требует ручной проверки: ${payload.chaosResult}`);
+    }
     if (payload.autoSkippedJail) {
       setRuntimeBlockedReason('Тюрьма была пройдена автоматически, потому что это не дроп и не тюремный статус.');
     }

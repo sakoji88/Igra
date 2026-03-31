@@ -12,9 +12,10 @@ import { grantThreeWheelSpins } from '@/lib/server/wheel';
 import { upcomingEventSchema, runUpdateSchema } from '@/lib/validation/forms';
 import { resolveActiveGameEffects, resolveDropEffects, resolveScoreEffects } from '@/lib/domain/effect-engine';
 
-export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PlayerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ warning?: string }> }) {
   const session = await requireSession();
   const { id } = await params;
+  const query = await searchParams;
 
   const [user, players] = await Promise.all([getProfileByUserId(id), getPlayersList()]);
   if (!user) notFound();
@@ -76,12 +77,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const session = await requireSession();
     if (session.user.id !== id && session.user.role !== 'ADMIN') redirect('/');
     const season = await getCurrentSeason();
-    await grantThreeWheelSpins({
-      giverRunId: String(formData.get('runId')),
-      giverUserId: id,
-      receiverUserId: String(formData.get('receiverUserId')),
-      seasonId: season.id,
-    });
+    try {
+      await grantThreeWheelSpins({
+        giverRunId: String(formData.get('runId')),
+        giverUserId: id,
+        receiverUserId: String(formData.get('receiverUserId')),
+        seasonId: season.id,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось выдать крутки.';
+      redirect(`/players/${id}?warning=${encodeURIComponent(message)}`);
+    }
     revalidatePath(`/players/${id}`);
     revalidatePath(`/players/${String(formData.get('receiverUserId'))}`);
     revalidatePath('/wheel');
@@ -145,6 +151,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     <AppLayout>
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <Card>
+          {query.warning ? <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{query.warning}</div> : null}
           <div className="flex items-center gap-4">
             <img src={user.avatarUrl ?? `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(user.nickname)}`} alt="avatar" className="h-20 w-20 rounded-full border border-zinc-700 object-cover" />
             <div>

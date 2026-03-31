@@ -74,7 +74,8 @@ export async function POST() {
     coinFlip: runtimeItems.some((item) => item.itemDefinition.number === 43) ? (Math.random() < 0.5 ? 'HEADS' : 'TAILS') : undefined,
   });
   const boardSize = await prisma.boardSlot.count({ where: { seasonId: season.id } });
-  const movementValue = effectResolution.movedBackwards ? (boardSize - (effectResolution.finalMoveTotal % boardSize || boardSize)) : effectResolution.finalMoveTotal;
+  const modifiedMoveTotal = effectResolution.finalMoveTotal;
+  const movementValue = effectResolution.movedBackwards ? (boardSize - (modifiedMoveTotal % boardSize || boardSize)) : modifiedMoveTotal;
   const moved = moveOnBoard(state.boardPosition, movementValue, boardSize);
   let slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: moved.nextPosition } } });
   let finalPosition = moved.nextPosition;
@@ -103,11 +104,20 @@ export async function POST() {
       finalPosition = (state.boardPosition + 20) % boardSize;
       slot = await prisma.boardSlot.findUnique({ where: { seasonId_slotNumber: { seasonId: season.id, slotNumber: finalPosition } } });
       chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[1]) {
+      // будет применено на следующем броске
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[2]) {
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[3]) {
+      chaosAutoApplied = true;
     } else if (chaosResult === chaosWheelConditions[7]) {
       scoreDeltaFromChaos = 1;
       chaosAutoApplied = true;
     } else if (chaosResult === chaosWheelConditions[8]) {
       scoreDeltaFromChaos = -1;
+      chaosAutoApplied = true;
+    } else if (chaosResult === chaosWheelConditions[10]) {
       chaosAutoApplied = true;
     } else {
       chaosNeedsManualFollowup = true;
@@ -134,7 +144,7 @@ export async function POST() {
         : undefined,
       lastDie1: effectResolution.die1,
       lastDie2: effectResolution.die2,
-      lastRollTotal: effectResolution.finalMoveTotal,
+      lastRollTotal: modifiedMoveTotal,
     },
   });
 
@@ -145,7 +155,7 @@ export async function POST() {
       seasonId: season.id,
       userId: session.user.id,
       type: 'TURN',
-      summary: `${actorName} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${finalPosition}${slot ? ` — ${slot.name}` : ''}${autoSkippedJail ? ' (тюрьма пропущена автоматически)' : ''}${lapBonus ? ` и получил ${lapBonus} поинтов за прохождение круга` : ''}.`,
+      summary: `${actorName} бросил ${effectResolution.die1} + ${effectResolution.die2}${die3 ? ` (+${die3}, взяты два лучших)` : ''}${effectResolution.movedBackwards ? ' и пошёл назад' : ''} до слота ${finalPosition}${slot ? ` — ${slot.name}` : ''}${autoSkippedJail ? ' (тюрьма пропущена автоматически)' : ''}${lapBonus ? ` и получил ${lapBonus} поинтов за прохождение круга` : ''}${chaosResult ? ` • Эффект подлянки/кайфарика: ${chaosResult}` : ''}.`,
       payload: {
         kind: 'ROLL_RESULT',
         from: state.boardPosition,
@@ -155,7 +165,7 @@ export async function POST() {
         die2: effectResolution.die2,
         die3,
         rawRollTotal: effectResolution.rawRollTotal,
-        finalMoveTotal: effectResolution.finalMoveTotal,
+        finalMoveTotal: modifiedMoveTotal,
         movedBackwards: effectResolution.movedBackwards,
         breakdown: [...rollMode.breakdown, ...effectResolution.breakdown],
         chaosResult,
@@ -170,7 +180,7 @@ export async function POST() {
     die2: effectResolution.die2,
     die3,
     total: effectResolution.rawRollTotal,
-    finalMoveTotal: effectResolution.finalMoveTotal,
+    finalMoveTotal: modifiedMoveTotal,
     movedBackwards: effectResolution.movedBackwards,
     breakdown: [...rollMode.breakdown, ...effectResolution.breakdown],
     state: updated,

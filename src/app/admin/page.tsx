@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { prisma } from '@/lib/prisma';
 import { requireRole, getCurrentSeason } from '@/lib/server/auth';
 import { getAdminData } from '@/lib/server/data';
+import { grantItemToState } from '@/lib/server/items';
 
 export default async function AdminPage() {
   await requireRole(['ADMIN']);
   const { season, players, logs, wheels } = await getAdminData();
+  const itemDefinitions = await prisma.itemDefinition.findMany({ where: { active: true }, orderBy: { number: 'asc' } });
 
   async function adjustPlayerAction(formData: FormData) {
     'use server';
@@ -35,6 +37,39 @@ export default async function AdminPage() {
     const wheel = await prisma.wheelDefinition.update({ where: { id: wheelId }, data: { name, description, imageUrl, active } });
     await prisma.eventLog.create({ data: { seasonId: season.id, type: 'ADMIN', summary: `Админ обновил колесо ${wheel.name}.`, payload: { wheelId } } });
     revalidatePath('/admin'); revalidatePath('/wheel');
+  }
+
+  async function addItemAction(formData: FormData) {
+    'use server';
+    const season = await getCurrentSeason();
+    const userId = String(formData.get('userId'));
+    const itemDefinitionId = String(formData.get('itemDefinitionId'));
+    const state = await prisma.playerSeasonState.findUnique({ where: { userId_seasonId: { userId, seasonId: season.id } } });
+    const definition = await prisma.itemDefinition.findUnique({ where: { id: itemDefinitionId } });
+    if (!state || !definition) return;
+    await grantItemToState({
+      playerSeasonStateId: state.id,
+      itemDefinition: {
+        id: definition.id,
+        name: definition.name,
+        type: definition.type,
+        conflictKey: definition.conflictKey,
+        chargesDefault: definition.chargesDefault,
+      },
+      sourceType: 'ADMIN',
+      seasonId: season.id,
+      userId,
+    });
+    revalidatePath('/admin'); revalidatePath(`/players/${userId}`);
+  }
+
+  async function removeItemAction(formData: FormData) {
+    'use server';
+    const userId = String(formData.get('userId'));
+    const inventoryItemId = String(formData.get('inventoryItemId'));
+    if (!inventoryItemId) return;
+    await prisma.playerInventoryItem.delete({ where: { id: inventoryItemId } });
+    revalidatePath('/admin'); revalidatePath(`/players/${userId}`);
   }
 
   return (
@@ -72,6 +107,23 @@ export default async function AdminPage() {
                     <input name="availableWheelSpins" defaultValue={player.availableWheelSpins} type="number" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3" />
                     <Button type="submit">Сохранить</Button>
                   </form>
+                  <div className="mt-4 grid gap-3">
+                    <form action={addItemAction} className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+                      <input type="hidden" name="userId" value={player.user.id} />
+                      <select name="itemDefinitionId" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3">
+                        {itemDefinitions.map((item) => <option key={item.id} value={item.id}>#{item.number} {item.name}</option>)}
+                      </select>
+                      <Button type="submit">Добавить предмет</Button>
+                    </form>
+                    <form action={removeItemAction} className="grid gap-3 md:grid-cols-[1fr_auto]">
+                      <input type="hidden" name="userId" value={player.user.id} />
+                      <select name="inventoryItemId" className="rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3">
+                        <option value="">Выбери предмет для удаления</option>
+                        {player.inventoryItems?.map((inventoryItem: any) => <option key={inventoryItem.id} value={inventoryItem.id}>#{inventoryItem.itemDefinition.number} {inventoryItem.itemDefinition.name} (заряды {inventoryItem.chargesCurrent})</option>)}
+                      </select>
+                      <Button type="submit" variant="danger">Удалить предмет</Button>
+                    </form>
+                  </div>
                 </div>
               ))}
             </div>

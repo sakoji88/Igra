@@ -260,7 +260,7 @@ export function resolveActiveGameConsumptions(items: InventoryRuntimeItem[]) {
     const config = getItemConfig(runtimeItem);
     if (!config) continue;
     for (const effect of getMatchingEffects(runtimeItem, 'while_game_active')) {
-      if (effect.oneTime || effect.consumption === 'manual') {
+      if (effect.oneTime && effect.consumption !== 'manual') {
         consumedItemIds.add(runtimeItem.inventoryItemId);
       }
     }
