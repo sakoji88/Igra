@@ -72,21 +72,7 @@ type BoardProps = {
 };
 
 const questionSlots = new Set([5, 15, 25, 35]);
-const chaosWheelSlots = new Set([2, 12, 22, 32]);
-const chaosWheelConditions = [
-  'Получите +1 к итоговому значению следующего броска.',
-  'Получите -1 к итоговому значению следующего броска.',
-  'Получите +2 к итоговому значению следующего броска.',
-  'Получите -2 к итоговому значению следующего броска.',
-  'Переместитесь на клетку "Аукциона" и пройдите там игру.',
-  'Переместитесь на клетку "Лотерея" и пройдите там игру.',
-  'Переместитесь на клетку "Фул рандом" с противоположной от вас стороны и пройдите там игру.',
-  'Получите 1 поинт.',
-  'Потеряйте 1 поинт.',
-  'Верхний порог времени следующей клетки ниже на 2 часа.',
-  'Текущее преодоление всего игрового поля дает лишь 2 поинта, вместо 5.',
-  'Вернитесь на клетку, с которой вы начинали текущий ход и совершите ход заново, сохранив эффекты событий и предметов, влияющих на движение.',
-] as const;
+const chaosWheelSlots = new Set<number>();
 
 type CellMeta = {
   gridColumn: number;
@@ -424,7 +410,6 @@ function SpecialSlotModal({
   const [gameUrl, setGameUrl] = useState('https://gamegauntlets.com/#settings');
   const [playerComment, setPlayerComment] = useState('');
   const [lotteryRoll, setLotteryRoll] = useState<number | null>(null);
-  const [chaosResult, setChaosResult] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const heading = type === 'AUCTION'
@@ -433,9 +418,7 @@ function SpecialSlotModal({
       ? 'Лотерея'
       : type === 'QUESTION'
         ? 'Клетка вопросика'
-        : type === 'CHAOS_WHEEL'
-          ? 'Подлянка / Кайфарик'
-          : type === 'JAIL'
+        : type === 'JAIL'
             ? 'Тюрьма'
           : 'Старт x Финиш';
 
@@ -445,9 +428,7 @@ function SpecialSlotModal({
       ? 'Лотерея - как игрок встает на слот, открывается окно с описание лотереи, есть в окне кнопка с выпадением числа в диапазоне от 1 до 31, что соответствует количеству уникальных пресетов на сайте https://gamegauntlets.com/#settings, после чего игрок крутит игру из пресета соответствующему выпавшему числу, номинальная награда за прохождение - 3 поинта.'
       : type === 'QUESTION'
         ? 'Добавить клетки вопросиков (5,15,25,35 клетки) высвечивается окно для ввода игры, эти клетки обозначают, что игрок роллит игру на сайте https://gamegauntlets.com без каких либо особенностей.'
-        : type === 'CHAOS_WHEEL'
-          ? 'Нет слотов подлянок и кайфариков (2, 12, 22, 32 слот) суть слотов в крутке из 12 условий, из бафов и дебафов, когда игрок попадает на слот, высвечивается окно с описание слота, и кнопкой крутки, выпадает одна из 12 подлянок или кайфариков и автоматически применяется, после игрок переходит автоматом на след клетку.'
-          : type === 'JAIL'
+        : type === 'JAIL'
             ? 'оформить клетку с тюрьмой чтобы не было выбора условий, когда игрок попадает в тюрьму после дропа игры, и он открывает поле, то сразу появляется окно с особенным тюремным, с условиями для ролла тюремной игры.'
           : 'Убрать окно выбора условий для старта и финиша.';
 
@@ -466,14 +447,6 @@ function SpecialSlotModal({
           </button>
         ) : null}
         {lotteryRoll ? <p className="mt-2 text-sm text-emerald-100">Выпало число: <b>{lotteryRoll}</b>. Выбери соответствующий пресет на GameGauntlets.</p> : null}
-        {type === 'CHAOS_WHEEL' ? (
-          <>
-            <button type="button" onClick={() => setChaosResult(chaosWheelConditions[Math.floor(Math.random() * chaosWheelConditions.length)] ?? null)} className="mt-4 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-2 text-sm text-fuchsia-100">
-              Крутка подлянки / кайфарика
-            </button>
-            {chaosResult ? <p className="mt-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-3 text-sm text-fuchsia-100">{chaosResult}</p> : null}
-          </>
-        ) : null}
         {type !== 'START' ? (
           <div className="mt-5 grid gap-3">
             <input value={gameTitle} onChange={(event) => { setGameTitle(event.target.value); setError(''); }} placeholder="Название назначенной игры" className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3" />
@@ -492,7 +465,7 @@ function SpecialSlotModal({
                   setError('Нужно указать игру, иначе активный слот останется без понятной записи.');
                   return;
                 }
-                onCreate({ gameTitle: gameTitle.trim(), gameUrl: gameUrl.trim(), playerComment: [playerComment.trim(), lotteryRoll ? `Лотерея: число ${lotteryRoll}` : null, chaosResult].filter(Boolean).join('\n') });
+                onCreate({ gameTitle: gameTitle.trim(), gameUrl: gameUrl.trim(), playerComment: [playerComment.trim(), lotteryRoll ? `Лотерея: число ${lotteryRoll}` : null].filter(Boolean).join('\n') });
               }}
               className="rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-100 disabled:opacity-40"
             >
@@ -527,7 +500,6 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     if (cell.type === 'AUCTION') return 'AUCTION';
     if (cell.type === 'LOTTERY') return 'LOTTERY';
     if (cell.type === 'JAIL' && isInJail) return 'JAIL';
-    if (chaosWheelSlots.has(cell.slotNumber)) return 'CHAOS_WHEEL';
     if (questionSlots.has(cell.slotNumber)) return 'QUESTION';
     return null;
   };
@@ -555,7 +527,7 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
     if (payload.landedSlot) {
       const nextCell = board.find((cell) => cell.id === payload.landedSlot.id);
       if (nextCell) {
-        const isSpecial = payload.skipConditionChoice || nextCell.type === 'START' || nextCell.type === 'AUCTION' || nextCell.type === 'LOTTERY' || questionSlots.has(nextCell.slotNumber) || chaosWheelSlots.has(nextCell.slotNumber);
+        const isSpecial = payload.skipConditionChoice || nextCell.type === 'START' || nextCell.type === 'AUCTION' || nextCell.type === 'LOTTERY' || questionSlots.has(nextCell.slotNumber);
         if (isSpecial) {
           const type = resolveSpecialType(nextCell) ?? 'QUESTION';
           setSpecialCell({ cell: nextCell, type });
@@ -565,9 +537,6 @@ export function PerimeterBoard({ board, players, activePlayer, seasonName, curre
       }
     }
     if (payload.showStartFinishAchievement && payload.lapBonus) setAchievementText(`Если игрок проходит игровое поле целиком, получает ${payload.lapBonus} поинтов.`);
-    if (payload.chaosResult) {
-      setRuntimeBlockedReason(payload.chaosAutoApplied ? `Подлянка/Кайфарик: ${payload.chaosResult}` : `Подлянка/Кайфарик требует ручной проверки: ${payload.chaosResult}`);
-    }
     if (payload.autoSkippedJail) {
       setRuntimeBlockedReason('Тюрьма была пройдена автоматически, потому что это не дроп и не тюремный статус.');
     }
